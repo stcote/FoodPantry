@@ -11,6 +11,10 @@ class MainWindow;
 
 //*****************************************************************************
 //*****************************************************************************
+/**
+ * @brief The MainWindow class
+ */
+//*****************************************************************************
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -25,6 +29,10 @@ private slots:
     void handleDisconnect();
     void handleAddName();
 
+    void handleCalibrate();
+    void handleShutdown();
+    void handleCancelCalibrate();
+
     void handleNameSelected( QListWidgetItem* item );
 
     void handleWeigh();
@@ -37,6 +45,8 @@ private:
 
     QStringList names_;
     QHash<QString,int> numItems_;
+
+    bool connected_;
 
 };
 

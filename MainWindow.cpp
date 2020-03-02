@@ -4,15 +4,23 @@
 const int CONNECT_PAGE = 0;
 const int NAME_PAGE = 1;
 const int WEIGH_PAGE = 2;
+const int CALIBRATE_PAGE = 3;
 
 
 //*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::MainWindow
+ * @param parent
+ */
 //*****************************************************************************
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+    connected_ = false;
 
     names_ << "Cote, Steven" << "Barr, Chris" << "Cunha, Lenny" << "Dichard, Bob" << "Cote, Lucy";
     numItems_[names_[0]] = 24;
@@ -35,11 +43,21 @@ MainWindow::MainWindow(QWidget *parent) :
     connect( ui->clearLastBtn, SIGNAL(clicked()), SLOT(handleClearLast()) );
     connect( ui->doneBtn, SIGNAL(clicked()), SLOT(handleDone()) );
 
+    connect( ui->calibrateBtn_1, SIGNAL(clicked()), SLOT(handleCalibrate()) );
+    connect( ui->calibrateBtn_2, SIGNAL(clicked()), SLOT(handleCalibrate()) );
+    connect( ui->shutdownBtn_1, SIGNAL(clicked()), SLOT(handleShutdown()) );
+    connect( ui->shutdownBtn_2, SIGNAL(clicked()), SLOT(handleShutdown()) );
+    connect( ui->cancelCalibrateBtn, SIGNAL(clicked()), SLOT(handleCancelCalibrate()) );
+
     ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
 }
 
 
 //*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::~MainWindow
+ */
 //*****************************************************************************
 MainWindow::~MainWindow()
 {
@@ -49,21 +67,37 @@ MainWindow::~MainWindow()
 
 //*****************************************************************************
 //*****************************************************************************
+/**
+ * @brief MainWindow::handleConnect
+ */
+//*****************************************************************************
 void MainWindow::handleConnect()
 {
     ui->widgetStack->setCurrentIndex( NAME_PAGE );
+
+    connected_ = true;
 }
 
 
 //*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleDisconnect
+ */
 //*****************************************************************************
 void MainWindow::handleDisconnect()
 {
     ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
+
+    connected_ = false;
 }
 
 
 //*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleAddName
+ */
 //*****************************************************************************
 void MainWindow::handleAddName()
 {
@@ -77,6 +111,54 @@ void MainWindow::handleAddName()
 
 
 //*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleCalibrate
+ */
+//*****************************************************************************
+void MainWindow::handleCalibrate()
+{
+    ui->widgetStack->setCurrentIndex( CALIBRATE_PAGE );
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleShutdown
+ */
+//*****************************************************************************
+void MainWindow::handleShutdown()
+{
+
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleCancelCalibrate
+ */
+//*****************************************************************************
+void MainWindow::handleCancelCalibrate()
+{
+    if ( connected_ )
+    {
+        ui->widgetStack->setCurrentIndex( NAME_PAGE );
+    }
+    else
+    {
+        ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
+    }
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleNameSelected
+ * @param item
+ */
 //*****************************************************************************
 void MainWindow::handleNameSelected( QListWidgetItem *item )
 {
@@ -102,6 +184,10 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
 
 //*****************************************************************************
 //*****************************************************************************
+/**
+ * @brief MainWindow::handleWeigh
+ */
+//*****************************************************************************
 void MainWindow::handleWeigh()
 {
 const double MAXVAL = (double)RAND_MAX;
@@ -118,6 +204,10 @@ const double MAXVAL = (double)RAND_MAX;
 
 //*****************************************************************************
 //*****************************************************************************
+/**
+ * @brief MainWindow::handleClearLast
+ */
+//*****************************************************************************
 void MainWindow::handleClearLast()
 {
     //*** must be at least one thing in list ***
@@ -130,6 +220,10 @@ void MainWindow::handleClearLast()
 
 
 //*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleDone
+ */
 //*****************************************************************************
 void MainWindow::handleDone()
 {
