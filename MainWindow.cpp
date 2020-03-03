@@ -1,10 +1,13 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
+#include <QDate>
 
-const int CONNECT_PAGE = 0;
-const int NAME_PAGE = 1;
-const int WEIGH_PAGE = 2;
+//*** page constants ***
+const int CONNECT_PAGE   = 0;
+const int NAME_PAGE      = 1;
+const int WEIGH_PAGE     = 2;
 const int CALIBRATE_PAGE = 3;
+const int SHUTDOWN_PAGE  = 4;
 
 
 //*****************************************************************************
@@ -21,13 +24,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     connected_ = false;
-
-    names_ << "Cote, Steven" << "Barr, Chris" << "Cunha, Lenny" << "Dichard, Bob" << "Cote, Lucy";
-    numItems_[names_[0]] = 24;
-    numItems_[names_[1]] = 30;
-    numItems_[names_[2]] = 18;
-    numItems_[names_[3]] = 24;
-    numItems_[names_[4]] = 30;
 
     ui->weighBtn->setStyleSheet( "background-color: green" );
     ui->clearLastBtn->setStyleSheet( "background-color: red" );
@@ -50,6 +46,8 @@ MainWindow::MainWindow(QWidget *parent) :
     connect( ui->cancelCalibrateBtn, SIGNAL(clicked()), SLOT(handleCancelCalibrate()) );
 
     ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
+
+    initFakeData();
 }
 
 
@@ -101,9 +99,15 @@ void MainWindow::handleDisconnect()
 //*****************************************************************************
 void MainWindow::handleAddName()
 {
-    if ( !names_.isEmpty() )
+t_CheckIn ci;
+
+    if ( !fake_.isEmpty() )
     {
-        QString name = names_.takeFirst();
+        ci = fake_.takeFirst();
+
+        QString name = ci.name;
+
+        clients_[name] = ci;
 
         ui->nameList->addItem( name );
     }
@@ -130,7 +134,7 @@ void MainWindow::handleCalibrate()
 //*****************************************************************************
 void MainWindow::handleShutdown()
 {
-
+    ui->widgetStack->setCurrentIndex( SHUTDOWN_PAGE );
 }
 
 
@@ -168,8 +172,12 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
     //*** display the WEIGH page ***
     ui->widgetStack->setCurrentIndex( WEIGH_PAGE );
 
+    //*** set current name ***
+    curName_ = name;
+
     //*** display name at top of page ***
-    ui->nameLbl->setText( name + " ( " + QString::number( numItems_[name] ) + " )" );
+    QString txt = QString( "%1 ( %2 )" ).arg(name).arg(clients_[name].numItems);
+    ui->nameLbl->setText( txt );
 
     //*** clear the weights ***
     ui->weightList->clear();
@@ -228,4 +236,60 @@ void MainWindow::handleClearLast()
 void MainWindow::handleDone()
 {
     ui->widgetStack->setCurrentIndex( NAME_PAGE );
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::setupServer
+ */
+//*****************************************************************************
+void MainWindow::setupServer()
+{
+
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::addClient
+ * @param ci
+ */
+//*****************************************************************************
+void MainWindow::addClient( t_CheckIn &ci )
+{
+    //*** grab name ***
+    QString name = ci.name;
+
+    //*** add to map ***
+    if ( !clients_.contains( name ) )
+    {
+        clients_[name] = ci;
+
+        ui->nameList->addItem( name );
+    }
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::initFakeData
+ */
+//*****************************************************************************
+void MainWindow::initFakeData()
+{
+t_CheckIn f1 = { 82,  "Cote, Steven", 24, 0 };
+t_CheckIn f2 = { 75,  "Barr, Chris",  30, 0 };
+t_CheckIn f3 = { 16,  "Cunha, Lenny", 24, 0 };
+t_CheckIn f4 = { 98,  "Dichard, Bob", 18, 0 };
+t_CheckIn f5 = { 128, "Cote, Lucy",   30, 0 };
+
+    fake_.append( f1 );
+    fake_.append( f2 );
+    fake_.append( f3 );
+    fake_.append( f4 );
+    fake_.append( f5 );
 }
