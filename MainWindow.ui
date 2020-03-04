@@ -18,12 +18,12 @@
     <item>
      <widget class="QStackedWidget" name="widgetStack">
       <property name="currentIndex">
-       <number>2</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="connectPage">
        <layout class="QVBoxLayout" name="verticalLayout_2" stretch="1,0">
         <item>
-         <widget class="QLabel" name="label">
+         <widget class="QLabel" name="connectLbl">
           <property name="palette">
            <palette>
             <active>

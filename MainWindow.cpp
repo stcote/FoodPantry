@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include <QDate>
+#include <QTcpSocket>
 
 //*** page constants ***
 const int CONNECT_PAGE   = 0;
@@ -8,6 +9,8 @@ const int NAME_PAGE      = 1;
 const int WEIGH_PAGE     = 2;
 const int CALIBRATE_PAGE = 3;
 const int SHUTDOWN_PAGE  = 4;
+
+const quint16 SCALE_PORT = 29456;
 
 
 //*****************************************************************************
@@ -24,6 +27,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     connected_ = false;
+    svr_ = nullptr;
 
     ui->weighBtn->setStyleSheet( "background-color: green" );
     ui->clearLastBtn->setStyleSheet( "background-color: red" );
@@ -48,6 +52,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
 
     initFakeData();
+
+    //*** set up the TCP server ***
+    setupServer();
 }
 
 
@@ -60,6 +67,8 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
     delete ui;
+
+    if ( svr_ ) delete svr_;
 }
 
 
@@ -242,12 +251,100 @@ void MainWindow::handleDone()
 //*****************************************************************************
 //*****************************************************************************
 /**
+ * @brief MainWindow::handleNewConnection
+ */
+//*****************************************************************************
+void MainWindow::handleNewConnection()
+{
+    //*** get pending connection ***
+    QTcpSocket *client = svr_->nextPendingConnection();
+
+    //*** delete on disconnect ***
+    connect( client, &QAbstractSocket::disconnected, this, &MainWindow::handleDisconnect);
+    connect( client, &QAbstractSocket::disconnected, client, &QObject::deleteLater);
+
+    connect( client, &QAbstractSocket::readyRead, this, &MainWindow::clientDataReady );
+    connect( client, SIGNAL(error(QAbstractSocket::SocketError)),
+                     SLOT(displayError( QAbstractSocket::SocketError )) );
+
+    //*** handle connection ***
+    handleConnect();
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::clientDataReady
+ */
+//*****************************************************************************
+void MainWindow::clientDataReady()
+{
+t_CheckIn ci;
+
+    //*** get socket that received data ***
+    QTcpSocket *sock = (QTcpSocket*)sender();
+
+    //*** get data ***
+    while ( sock->bytesAvailable() >= CHECKIN_SIZE )
+    {
+        if ( sock->read( (char*)&ci, CHECKIN_SIZE ) == CHECKIN_SIZE )
+        {
+            //*** grab name ***
+            QString name = ci.name;
+
+            //*** add to map ***
+            clients_[name] = ci;
+
+            //*** display on name screen ***
+            ui->nameList->addItem( name );
+        }
+    }
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::displayError
+ * @param socketError
+ */
+//*****************************************************************************
+void MainWindow::displayError( QAbstractSocket::SocketError socketError )
+{
+Q_UNUSED( socketError )
+
+    //*** get socket that received error ***
+    QTcpSocket *sock = static_cast<QTcpSocket*>(sender());
+
+    qDebug() << "Socket Error: " << sock->errorString();
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
  * @brief MainWindow::setupServer
  */
 //*****************************************************************************
 void MainWindow::setupServer()
 {
+    //*** don't set up twice ***
+    if ( svr_ ) return;
 
+    //*** create the server ***
+    svr_ = new QTcpServer( this );
+
+    //*** start listening on our port ***
+    if ( !svr_->listen( QHostAddress::Any, SCALE_PORT ) )
+    {
+        qDebug() << "Error listening on TCP port!!!";
+        ui->connectLbl->setText( "Server Error" );
+    }
+    else
+    {
+        connect (svr_, &QTcpServer::newConnection, this, &MainWindow::handleNewConnection );
+    }
 }
 
 

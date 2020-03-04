@@ -53,6 +53,10 @@ private slots:
     void handleClearLast();
     void handleDone();
 
+    void handleNewConnection();
+    void clientDataReady();
+    void displayError( QAbstractSocket::SocketError socketError );
+
 
 private:
 
