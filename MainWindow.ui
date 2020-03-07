@@ -18,7 +18,7 @@
     <item>
      <widget class="QStackedWidget" name="widgetStack">
       <property name="currentIndex">
-       <number>0</number>
+       <number>3</number>
       </property>
       <widget class="QWidget" name="connectPage">
        <layout class="QVBoxLayout" name="verticalLayout_2" stretch="1,0">
@@ -1371,7 +1371,7 @@ Connection</string>
          <enum>QFrame::Sunken</enum>
         </property>
         <property name="text">
-         <string>Nothing on scale, 
+         <string>Clear scale,
 click CONTINUE</string>
         </property>
         <property name="alignment">
@@ -1425,7 +1425,7 @@ click CONTINUE</string>
      <x>0</x>
      <y>0</y>
      <width>821</width>
-     <height>21</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

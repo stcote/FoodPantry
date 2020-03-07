@@ -2,10 +2,8 @@
 #include <time.h>
 #include <wiringPi.h>
 #include <stdio.h>
-#include <array>
-#include <list>
-#include <algorithm>
-
+#include <QList>
+#include <QDebug>
 
 //*****************
 //*** CONSTANTS ***
@@ -32,7 +30,8 @@ static int SCK_Pin_ = 0;
 
 //*** last value read and time ***
 static volatile int readValue_ = 0;;
-static volatile NSecTime readTime_ = 0;
+static volatile int samplesToCollect_ = 0;
+static QList<int> collectedData_;
 
 //*** flag to indicate that we are reading in data ***
 static volatile bool readingData_ = false;
@@ -63,57 +62,71 @@ void HX711_init( int DT_Pin, int SCK_Pin, int rawTare, double scale )
 
 //*****************************************************************************
 //*****************************************************************************
-float HX711_getWeight()
+void HX711_collectRawData( int numSamples, QList<int> &data )
 {
-int numSamplesCollected = 0;
-float weightVal = 0;
-NSecTime lastProcessed = 0;
-double total = 0;
-std::array<int,SAMPLES_PER_WEIGHT> data;
+    //*** set # samples to collect ***
+    samplesToCollect_ = numSamples;
 
-
-    //*** wait for # samples to be collected ***
-    while ( numSamplesCollected < SAMPLES_PER_WEIGHT ) 
+    //*** wait for it to be collected ***
+    while( samplesToCollect_ > 0 )
     {
-        //*** check if we have a new sample ***
-        if ( readTime_ > lastProcessed )
-        {
-            //*** get data and update time ***
-            lastProcessed = readTime_;
-            data[numSamplesCollected++] = -H_extendSign(readValue_);
-        }
-
-        //*** otherwise, wait a bit ***
-        else
-        {
-            //*** wait for a millisecond ***
-            delay( 1 );
-        }
+        delay( 5 );
     }
-    
+
+    //*** copy the data ***
+    data = collectedData_;
+    collectedData_.clear();
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+int HX711_getRawAverage( int numSamples, QList<int> &data )
+{
+long long int total = 0;
+int rawAvg = 0;
+
+    //*** clear the output array ***
+    data.clear();
+
+    //*** collect the desired # samples ***
+    HX711_collectRawData( numSamples, data );
+
     //*** determine median value ***
-    int mid = SAMPLES_PER_WEIGHT / 2;
+    int mid = numSamples / 2;
     int median = ( data[mid] + data[mid-1] ) / 2;
     int variant = median / 10;
-    
-//    for( int i=0; i<SAMPLES_PER_WEIGHT; i++ )
-//    {
-//        printf( "i: %d   data: %d\n", i, data[i] );
-//    }
-    
-//    printf( "median: %d  variant: %d\n", median, variant );
-    
-    //*** remove outliers ***
-    for ( int i=0; i<SAMPLES_PER_WEIGHT; i++ )
+
+    //*** remove outliers and add to total ***
+    for ( int i=0; i<numSamples; i++ )
     {
         int diff = abs( data[i] - median );
-        if ( diff > abs(variant) ) 
+        if ( diff > abs(variant) )
         {
             data[i] = median;
-            printf( "diff: %d  variant: %d *\n", diff, variant );
         }
+
+        total += data[i];
     }
-    
+
+    //*** calc average ***
+    rawAvg = total / numSamples;
+
+    return rawAvg;
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+float HX711_getWeight()
+{
+QList<int> data;
+double total = 0;
+float weightVal = 0;
+
+    //*** collect raw data, removing outliers ***
+    HX711_getRawAverage( SAMPLES_PER_WEIGHT, data );
+
     //*** calculate weight average ***
     for ( int i=0; i<SAMPLES_PER_WEIGHT; i++ )
     {
@@ -166,6 +179,7 @@ static void H_fallingEdgeISR()
 int i = 0;
 int tempReadValue = 0;
 const int NUM_BITS = 24;    // 24 bit A/D converter
+QString bits;
 
     //*** make sure we are valid to read ***
     //*** reading flag should be reset and DT oin should be low ***
@@ -196,18 +210,25 @@ const int NUM_BITS = 24;    // 24 bit A/D converter
         if ( digitalRead( DT_Pin_ ) ) 
         {
             tempReadValue |= 0x0001;
-//            printf("1");
+            bits += "1";
         }
-//        else
-//        {
-//            printf("0");
-//        }
+        else
+        {
+            bits += "0";
+        }
     }
-//    printf("\n" );
     
-    //*** have all bits, save the data and time ***
+    //*** have all bits, save the data ***
     readValue_ = tempReadValue;
-    readTime_ = H_getNSecTime();
+
+    //*** check if collecting data ***
+    if ( samplesToCollect_ > 0 )
+    {
+        collectedData_.append( (int)-H_extendSign(readValue_) );
+        samplesToCollect_--;
+//        qDebug() << bits;
+//        if ( samplesToCollect_ == 0 ) qDebug() << "";
+    }
 
     //*** need one more pulse to indicate a gain of 128 ***
     //*** 2 pulses = gain of 32, 3 pulses = gain of 64  ***
@@ -225,38 +246,7 @@ const int NUM_BITS = 24;    // 24 bit A/D converter
 //*****************************************************************************
 void H_pulseDelay()
 {
-//const int      PulseDelay  = 5;
-//const NSecTime DelayTime   = PulseDelay * USecsPerSec;
-//NSecTime       startTime   = H_getNSecTime();
-
-    delayMicroseconds( 5 );
-//    while ( 1 )
-//    {
-//        //*** if at or more than delay time, return ***
-//        if ( H_getNSecTime() - startTime >= DelayTime )
-//        {
-//            return;
-//        }
-//    }
-}
-
-
-//*****************************************************************************
-//*****************************************************************************
-NSecTime H_getNSecTime()
-{
-struct timespec timeNow;
-NSecTime retTime = 0;
-
-    //*** get the current time ***
-    clock_gettime( CLOCK_REALTIME, &timeNow );
-
-    //*** convert to singular nanosecond resolution time ***
-    retTime = timeNow.tv_sec;
-    retTime *= NSecsPerSec;
-    retTime += timeNow.tv_nsec;
-    
-    return retTime; 
+    delayMicroseconds( 2 );
 }
 
 

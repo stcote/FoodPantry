@@ -1,6 +1,8 @@
 #ifndef HX711_H
 #define HX711_H
 
+#include <QList>
+
     //****************
     //*** typedefs ***
     //****************
@@ -17,6 +19,10 @@
 
    int   HX711_getRawReading();
 
+   void  HX711_collectRawData( int numSamples, QList<int> &data );
+
+   int   HX711_getRawAverage(int numSamples , QList<int> &data );
+
    void  HX711_setCalibrationData( int tareVal, int weightVal, float actualWeight );
 
    void  HX711_getCalibrationData( int &rawTareValue, double &scaleValue );
@@ -28,7 +34,7 @@
 
    void H_pulseDelay();
 
-   NSecTime H_getNSecTime();
+//   NSecTime H_getNSecTime();
 
    int H_extendSign( int val );
 

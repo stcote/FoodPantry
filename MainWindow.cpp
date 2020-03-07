@@ -2,6 +2,9 @@
 #include "ui_MainWindow.h"
 #include <QDate>
 #include <QTcpSocket>
+#include <QSettings>
+#include <wiringPi.h>
+#include "HX711.h"
 
 //*** page constants ***
 const int CONNECT_PAGE   = 0;
@@ -11,6 +14,28 @@ const int CALIBRATE_PAGE = 3;
 const int SHUTDOWN_PAGE  = 4;
 
 const quint16 SCALE_PORT = 29456;
+
+const int WEIGHT_TIMER_MSEC = 333;
+
+const QString ORG_NAME = "FoodPantry";
+const QString APP_NAME = "FoodPantry";
+
+const QString TARE_STR  = "TARE";
+const QString SCALE_STR = "SCALE";
+
+const int    DEFAULT_TARE  = -214054;
+const double DEFAULT_SCALE = 0.0000913017;
+
+const int DT_PIN = 21;
+const int SCK_PIN = 20;
+
+const QString CAL_STR_1 = "Empty Scale\nClick Continue";
+const QString CAL_STR_2 = "Add 10 lbs to scale\nClick Continue";
+const QString CAL_STR_3 = "Calibration Complete";
+
+const float CAL_WEIGHT = 10.0;
+
+const float BASKET_TARE = 3.5;
 
 
 //*****************************************************************************
@@ -28,6 +53,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connected_ = false;
     svr_ = nullptr;
+    curCalMode_ = NOCAL_MODE;
 
     ui->weighBtn->setStyleSheet( "background-color: green" );
     ui->clearLastBtn->setStyleSheet( "background-color: red" );
@@ -48,13 +74,35 @@ MainWindow::MainWindow(QWidget *parent) :
     connect( ui->shutdownBtn_1, SIGNAL(clicked()), SLOT(handleShutdown()) );
     connect( ui->shutdownBtn_2, SIGNAL(clicked()), SLOT(handleShutdown()) );
     connect( ui->cancelCalibrateBtn, SIGNAL(clicked()), SLOT(handleCancelCalibrate()) );
+    connect( ui->continueBtn, SIGNAL(clicked()), SLOT(handleCalibrateContinue()) );
 
     ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
+
+    //*** initialize for settings ***
+    QCoreApplication::setOrganizationName( ORG_NAME );
+    QCoreApplication::setApplicationName( APP_NAME );
+
+    //*** load the settings ***
+    loadSettings();
+
+    //*** set up the scale ***
+    setupScale();
+
+    //*** weight timer ***
+    weightTimer_ = new QTimer( this );
+    weightTimer_->setInterval( WEIGHT_TIMER_MSEC );
+    connect( weightTimer_, SIGNAL(timeout()), SLOT(displayWeight()) );
+    weightTimer_->start();
 
     initFakeData();
 
     //*** set up the TCP server ***
     setupServer();
+
+    //*** clear all weight displays ***
+    ui->weighLbl_1->clear();
+    ui->weighLbl_2->clear();
+    ui->weighLbl_3->clear();
 }
 
 
@@ -66,9 +114,16 @@ MainWindow::MainWindow(QWidget *parent) :
 //*****************************************************************************
 MainWindow::~MainWindow()
 {
+    //*** save scale calibration values ***
+    saveSettings();
+
     delete ui;
 
+    //*** TCP server ***
     if ( svr_ ) delete svr_;
+
+    //*** weight timer ***
+    if ( weightTimer_ ) delete weightTimer_;
 }
 
 
@@ -131,7 +186,61 @@ t_CheckIn ci;
 //*****************************************************************************
 void MainWindow::handleCalibrate()
 {
+    if ( curCalMode_ != NOCAL_MODE ) return;
+
     ui->widgetStack->setCurrentIndex( CALIBRATE_PAGE );
+
+    ui->calibrateLbl->setText( CAL_STR_1 );
+    curCalMode_ = TARE_MODE;
+
+    weightTimer_->stop();
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleCalibrateContinue
+ */
+//*****************************************************************************
+void MainWindow::handleCalibrateContinue()
+{
+QList<int> data;
+
+    if ( curCalMode_ == NOCAL_MODE ) return;
+
+    if ( curCalMode_ == TARE_MODE )
+    {
+        //*** get average raw value for tare ***
+        calTareVal_ = HX711_getRawAverage( 10, data );
+
+//        qDebug() << "calTareVal_:" << calTareVal_;
+
+        ui->calibrateLbl->setText( CAL_STR_2 );
+
+        curCalMode_ = WEIGHT_MODE;
+    }
+
+    else if ( curCalMode_ == WEIGHT_MODE )
+    {
+        //*** get average raw value for the weight ***
+        calWeightVal_ = HX711_getRawAverage( 10, data );
+
+        //*** set new calibration data ***
+        HX711_setCalibrationData( calTareVal_, calWeightVal_, CAL_WEIGHT );
+
+        //*** get and save new values ***
+        HX711_getCalibrationData( tare_, scale_ );
+        saveSettings();
+
+        ui->calibrateLbl->setText( CAL_STR_3 );
+
+        curCalMode_ = NOCAL_MODE;
+
+        weightTimer_->start();
+
+        handleCancelCalibrate();
+    }
 }
 
 
@@ -207,12 +316,20 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
 //*****************************************************************************
 void MainWindow::handleWeigh()
 {
-const double MAXVAL = (double)RAND_MAX;
+    //*** read the scale ***
+    float weight = HX711_getWeight();
 
-    //*** create a number between 5 and 25 ***
-    double w = ((double)qrand() / MAXVAL) * 20 + 5;
+    if ( ui->basketBtn->isChecked() )
+    {
+        weight -= BASKET_TARE;
+        if ( weight < 0.0 )
+        {
+            weight = 0.0;
+        }
+    }
+
     QString wLine;
-    wLine.sprintf( "%.1lf", w );
+    wLine.sprintf( "%.1lf", weight );
 
     //*** add to the list of weights ***
     ui->weightList->addItem( wLine );
@@ -324,6 +441,25 @@ Q_UNUSED( socketError )
 //*****************************************************************************
 //*****************************************************************************
 /**
+ * @brief MainWindow::displayWeight
+ */
+//*****************************************************************************
+void MainWindow::displayWeight()
+{
+    float weight = HX711_getWeight();
+
+    QString buf;
+    buf.sprintf( "%.1f", weight );
+
+    ui->weighLbl_1->setText( buf );
+    ui->weighLbl_2->setText( buf );
+    ui->weighLbl_3->setText( buf );
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
  * @brief MainWindow::setupServer
  */
 //*****************************************************************************
@@ -351,6 +487,20 @@ void MainWindow::setupServer()
 //*****************************************************************************
 //*****************************************************************************
 /**
+ * @brief MainWindow::setupScale
+ */
+//*****************************************************************************
+void MainWindow::setupScale()
+{
+    wiringPiSetupGpio() ;
+
+    HX711_init( DT_PIN, SCK_PIN, tare_, scale_ );
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
  * @brief MainWindow::addClient
  * @param ci
  */
@@ -367,6 +517,41 @@ void MainWindow::addClient( t_CheckIn &ci )
 
         ui->nameList->addItem( name );
     }
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::loadSettings
+ */
+//*****************************************************************************
+void MainWindow::loadSettings()
+{
+QSettings s;
+
+    //*** tare value ***
+    tare_ = s.value( TARE_STR, DEFAULT_TARE ).toInt();
+
+    //*** scale value ***
+    scale_ = s.value( SCALE_STR, DEFAULT_SCALE ).toDouble();
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::saveSettings
+ */
+//*****************************************************************************
+void MainWindow::saveSettings()
+{
+QSettings s;
+
+    //*** save values ***
+    s.setValue( TARE_STR, tare_ );
+    s.setValue( SCALE_STR, scale_ );
+
 }
 
 

@@ -5,23 +5,25 @@
 #include <QListWidgetItem>
 #include <QHash>
 #include <QTcpServer>
+#include <QTimer>
 
 namespace Ui {
 class MainWindow;
 }
 
-const int NAME_MAX = 127;
+const int FP_NAME_MAX = 127;
 
 typedef struct
 {
     int key;
-    char name[NAME_MAX+1];
+    char name[FP_NAME_MAX+1];
     int  numItems;
     qint64 day;
 } t_CheckIn;
 
 const int CHECKIN_SIZE = sizeof( t_CheckIn );
 
+typedef enum { NOCAL_MODE, TARE_MODE, WEIGHT_MODE } CalMode;
 
 //*****************************************************************************
 //*****************************************************************************
@@ -46,6 +48,7 @@ private slots:
     void handleCalibrate();
     void handleShutdown();
     void handleCancelCalibrate();
+    void handleCalibrateContinue();
 
     void handleNameSelected( QListWidgetItem* item );
 
@@ -57,14 +60,23 @@ private slots:
     void clientDataReady();
     void displayError( QAbstractSocket::SocketError socketError );
 
+    void displayWeight();
+
 
 private:
 
     //*** set up the TCP server ***
     void setupServer();
 
+    //*** set up scale ***
+    void setupScale();
+
     //*** add a new client to the list ***
     void addClient( t_CheckIn &ci );
+
+    //*** settings ***
+    void loadSettings();
+    void saveSettings();
 
     //*** initialize the fake data for testing ***
     void initFakeData();
@@ -83,6 +95,17 @@ private:
 
     //*** TCP server ***
     QTcpServer *svr_;
+
+    //*** timer to display weight ***
+    QTimer *weightTimer_;
+
+    //*** scale vars ***
+    int tare_;
+    double scale_;
+
+    CalMode curCalMode_;
+    int calTareVal_;
+    int calWeightVal_;
 
     //*** list of fake data for testing ***
     QList<t_CheckIn> fake_;

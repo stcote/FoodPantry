@@ -13,8 +13,12 @@ TEMPLATE = app
 
 
 SOURCES += main.cpp\
-        MainWindow.cpp
+        MainWindow.cpp \
+        HX711.cpp
 
-HEADERS  += MainWindow.h
+HEADERS  += MainWindow.h \
+    HX711.h
 
 FORMS    += MainWindow.ui
+
+LIBS += -lwiringPi
