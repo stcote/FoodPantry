@@ -218,10 +218,6 @@ QList<int> data;
     {
         //*** get average raw value for tare ***
         hx711_->getRawAvg( NUM_CAL_SAMPLES );
-
-        ui->calibrateLbl->setText( CAL_STR_2 );
-
-        curCalMode_ = WEIGHT_MODE;
     }
 
     else if ( curCalMode_ == WEIGHT_MODE )
@@ -235,8 +231,8 @@ QList<int> data;
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::displayError
- * @param socketError
+ * @brief MainWindow::handleGetRawAvg
+ * @param rawAvg
  */
 //*****************************************************************************
 void MainWindow::handleGetRawAvg( int rawAvg )
