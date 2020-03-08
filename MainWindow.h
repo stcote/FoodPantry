@@ -6,6 +6,7 @@
 #include <QHash>
 #include <QTcpServer>
 #include <QTimer>
+#include "HX711.h"
 
 namespace Ui {
 class MainWindow;
@@ -60,7 +61,10 @@ private slots:
     void clientDataReady();
     void displayError( QAbstractSocket::SocketError socketError );
 
-    void displayWeight();
+    void requestWeight();
+
+    void handleGetRawAvg( int rawAvg );
+    void handleGetWeight( float w );
 
 
 private:
@@ -84,6 +88,9 @@ private:
     //*** UI ***
     Ui::MainWindow *ui;
 
+    //*** scale reader object ***
+    HX711 *hx711_;
+
     //*** map client name to client data ***
     QHash<QString,t_CheckIn> clients_;
 
@@ -106,6 +113,8 @@ private:
     CalMode curCalMode_;
     int calTareVal_;
     int calWeightVal_;
+
+    float lastWeight_;
 
     //*** list of fake data for testing ***
     QList<t_CheckIn> fake_;

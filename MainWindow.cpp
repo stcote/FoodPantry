@@ -34,9 +34,11 @@ const QString CAL_STR_2 = "Add 10 lbs to scale\nClick Continue";
 const QString CAL_STR_3 = "Calibration Complete";
 
 const float CAL_WEIGHT = 10.0;
+const int NUM_CAL_SAMPLES = 10;
 
 const float BASKET_TARE = 3.5;
 
+const float INVALID_WEIGHT = -999.9;
 
 //*****************************************************************************
 //*****************************************************************************
@@ -45,7 +47,7 @@ const float BASKET_TARE = 3.5;
  * @param parent
  */
 //*****************************************************************************
-MainWindow::MainWindow(QWidget *parent) :
+MainWindow::MainWindow( QWidget *parent ) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
@@ -54,6 +56,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connected_ = false;
     svr_ = nullptr;
     curCalMode_ = NOCAL_MODE;
+    lastWeight_ = INVALID_WEIGHT;
 
     ui->weighBtn->setStyleSheet( "background-color: green" );
     ui->clearLastBtn->setStyleSheet( "background-color: red" );
@@ -91,7 +94,7 @@ MainWindow::MainWindow(QWidget *parent) :
     //*** weight timer ***
     weightTimer_ = new QTimer( this );
     weightTimer_->setInterval( WEIGHT_TIMER_MSEC );
-    connect( weightTimer_, SIGNAL(timeout()), SLOT(displayWeight()) );
+    connect( weightTimer_, SIGNAL(timeout()), SLOT(requestWeight()) );
     weightTimer_->start();
 
     initFakeData();
@@ -118,6 +121,8 @@ MainWindow::~MainWindow()
     saveSettings();
 
     delete ui;
+
+    delete hx711_;
 
     //*** TCP server ***
     if ( svr_ ) delete svr_;
@@ -212,9 +217,7 @@ QList<int> data;
     if ( curCalMode_ == TARE_MODE )
     {
         //*** get average raw value for tare ***
-        calTareVal_ = HX711_getRawAverage( 10, data );
-
-//        qDebug() << "calTareVal_:" << calTareVal_;
+        hx711_->getRawAvg( NUM_CAL_SAMPLES );
 
         ui->calibrateLbl->setText( CAL_STR_2 );
 
@@ -224,13 +227,38 @@ QList<int> data;
     else if ( curCalMode_ == WEIGHT_MODE )
     {
         //*** get average raw value for the weight ***
-        calWeightVal_ = HX711_getRawAverage( 10, data );
+        hx711_->getRawAvg( NUM_CAL_SAMPLES );
+    }
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::displayError
+ * @param socketError
+ */
+//*****************************************************************************
+void MainWindow::handleGetRawAvg( int rawAvg )
+{
+    if ( curCalMode_ == TARE_MODE )
+    {
+        calTareVal_ = rawAvg;
+
+        ui->calibrateLbl->setText( CAL_STR_2 );
+
+        curCalMode_ = WEIGHT_MODE;
+    }
+
+    else if ( curCalMode_ == WEIGHT_MODE )
+    {
+        calWeightVal_ = rawAvg;
 
         //*** set new calibration data ***
-        HX711_setCalibrationData( calTareVal_, calWeightVal_, CAL_WEIGHT );
+        hx711_->setCalibrationData( calTareVal_, calWeightVal_, CAL_WEIGHT );
 
         //*** get and save new values ***
-        HX711_getCalibrationData( tare_, scale_ );
+        hx711_->getCalibrationData( tare_, scale_ );
         saveSettings();
 
         ui->calibrateLbl->setText( CAL_STR_3 );
@@ -317,7 +345,9 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
 void MainWindow::handleWeigh()
 {
     //*** read the scale ***
-    float weight = HX711_getWeight();
+    float weight = lastWeight_;
+
+    if ( weight == INVALID_WEIGHT ) weight = 0.0;
 
     if ( ui->basketBtn->isChecked() )
     {
@@ -441,15 +471,29 @@ Q_UNUSED( socketError )
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::displayWeight
+ * @brief MainWindow::requestWeight
  */
 //*****************************************************************************
-void MainWindow::displayWeight()
+void MainWindow::requestWeight()
 {
-    float weight = HX711_getWeight();
+    hx711_->getWeight();
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::displayError
+ * @param socketError
+ */
+//*****************************************************************************
+void MainWindow::handleGetWeight( float w )
+{
+    //*** save last weight ***
+    lastWeight_ = w;
 
     QString buf;
-    buf.sprintf( "%.1f", weight );
+    buf.sprintf( "%.1f", w );
 
     ui->weighLbl_1->setText( buf );
     ui->weighLbl_2->setText( buf );
@@ -492,9 +536,10 @@ void MainWindow::setupServer()
 //*****************************************************************************
 void MainWindow::setupScale()
 {
-    wiringPiSetupGpio() ;
+    hx711_ = new HX711( DT_PIN, SCK_PIN, tare_, scale_ );
 
-    HX711_init( DT_PIN, SCK_PIN, tare_, scale_ );
+    connect( hx711_, SIGNAL(rawAvg(int)), SLOT(handleGetRawAvg(int)) );
+    connect( hx711_, SIGNAL(weight(float)), SLOT(handleGetWeight(float)) );
 }
 
 
