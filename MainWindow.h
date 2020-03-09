@@ -24,7 +24,7 @@ typedef struct
 
 const int CHECKIN_SIZE = sizeof( t_CheckIn );
 
-typedef enum { NOCAL_MODE, TARE_MODE, WEIGHT_MODE } CalMode;
+typedef enum { NOCAL_MODE, CAL_TARE_MODE, CAL_WEIGHT_MODE, TARE_MODE } CalMode;
 
 //*****************************************************************************
 //*****************************************************************************
@@ -60,6 +60,8 @@ private slots:
     void handleNewConnection();
     void clientDataReady();
     void displayError( QAbstractSocket::SocketError socketError );
+
+    void handleTare();
 
     void requestWeight();
 

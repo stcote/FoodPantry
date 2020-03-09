@@ -3,6 +3,9 @@
 #include <QDate>
 #include <QTcpSocket>
 #include <QSettings>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QThread>
 #include <wiringPi.h>
 #include "HX711.h"
 
@@ -35,10 +38,13 @@ const QString CAL_STR_3 = "Calibration Complete";
 
 const float CAL_WEIGHT = 10.0;
 const int NUM_CAL_SAMPLES = 10;
+const int NUM_TARE_SAMPLES = 4;
 
 const float BASKET_TARE = 3.5;
 
-const float INVALID_WEIGHT = -999.9;
+const float INVALID_WEIGHT = -999;
+
+const int TOUCHSCREEN_Y = 480;
 
 //*****************************************************************************
 //*****************************************************************************
@@ -79,6 +85,12 @@ MainWindow::MainWindow( QWidget *parent ) :
     connect( ui->cancelCalibrateBtn, SIGNAL(clicked()), SLOT(handleCancelCalibrate()) );
     connect( ui->continueBtn, SIGNAL(clicked()), SLOT(handleCalibrateContinue()) );
 
+    connect( ui->weighLbl_1, SIGNAL(clicked()), SLOT(handleTare()) );
+    connect( ui->weighLbl_2, SIGNAL(clicked()), SLOT(handleTare()) );
+    connect( ui->weighLbl_3, SIGNAL(clicked()), SLOT(handleTare()) );
+
+    connect( ui->exitBtn, SIGNAL(clicked()), SLOT(close()) );
+
     ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
 
     //*** initialize for settings ***
@@ -106,6 +118,20 @@ MainWindow::MainWindow( QWidget *parent ) :
     ui->weighLbl_1->clear();
     ui->weighLbl_2->clear();
     ui->weighLbl_3->clear();
+
+    //*** determine if we are using the touchscreen ***
+    int screenY = QGuiApplication::primaryScreen()->geometry().height();
+    if ( screenY == TOUCHSCREEN_Y )
+    {
+        //*** hide menu bar ***
+        ui->menuBar->hide();
+
+        //*** make frameless ***
+        setWindowFlags( Qt::FramelessWindowHint );
+
+        //*** full screen ***
+        showFullScreen();
+    }
 }
 
 
@@ -196,7 +222,7 @@ void MainWindow::handleCalibrate()
     ui->widgetStack->setCurrentIndex( CALIBRATE_PAGE );
 
     ui->calibrateLbl->setText( CAL_STR_1 );
-    curCalMode_ = TARE_MODE;
+    curCalMode_ = CAL_TARE_MODE;
 
     weightTimer_->stop();
 }
@@ -214,13 +240,13 @@ QList<int> data;
 
     if ( curCalMode_ == NOCAL_MODE ) return;
 
-    if ( curCalMode_ == TARE_MODE )
+    if ( curCalMode_ == CAL_TARE_MODE )
     {
         //*** get average raw value for tare ***
         hx711_->getRawAvg( NUM_CAL_SAMPLES );
     }
 
-    else if ( curCalMode_ == WEIGHT_MODE )
+    else if ( curCalMode_ == CAL_WEIGHT_MODE )
     {
         //*** get average raw value for the weight ***
         hx711_->getRawAvg( NUM_CAL_SAMPLES );
@@ -239,14 +265,23 @@ void MainWindow::handleGetRawAvg( int rawAvg )
 {
     if ( curCalMode_ == TARE_MODE )
     {
+        tare_ = rawAvg;
+        hx711_->setTare( tare_ );
+        weightTimer_->start();
+        curCalMode_ = NOCAL_MODE;
+        qDebug() << "Set tare to : " << tare_;
+    }
+
+    else if ( curCalMode_ == CAL_TARE_MODE )
+    {
         calTareVal_ = rawAvg;
 
         ui->calibrateLbl->setText( CAL_STR_2 );
 
-        curCalMode_ = WEIGHT_MODE;
+        curCalMode_ = CAL_WEIGHT_MODE;
     }
 
-    else if ( curCalMode_ == WEIGHT_MODE )
+    else if ( curCalMode_ == CAL_WEIGHT_MODE )
     {
         calWeightVal_ = rawAvg;
 
@@ -461,6 +496,32 @@ Q_UNUSED( socketError )
     QTcpSocket *sock = static_cast<QTcpSocket*>(sender());
 
     qDebug() << "Socket Error: " << sock->errorString();
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleTare
+ */
+//*****************************************************************************
+void MainWindow::handleTare()
+{
+    //*** indicate we are doing a tare ***
+    curCalMode_ = TARE_MODE;
+
+    //*** stop auto timer ***
+    weightTimer_->stop();
+
+    QThread::msleep( 100 );
+
+    //*** request averge samples ***
+    qDebug() << "Getting tare";
+    while ( !hx711_->getRawAvg( NUM_TARE_SAMPLES ) )
+    {
+        qDebug() << "waiting...";
+        QThread::msleep( 100 );
+    }
 }
 
 

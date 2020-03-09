@@ -34,7 +34,9 @@ public:
 
     void setCalibrationData( int tareVal, int weightVal, float actualWeight );
 
-    void getCalibrationData( int &rawTareValue, double &scaleValue );\
+    void getCalibrationData( int &rawTareValue, double &scaleValue );
+
+    void setTare( int tareVal );
 
     //*** invoked by ISR when collection complete ***
     void dataCollected();
