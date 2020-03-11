@@ -10,6 +10,11 @@
 
 const int SAMPLES_PER_WEIGHT = 4;
 
+const int SAMPLES_PER_SECOND = 10;
+const int SECONDS_QUEUED     = 2;
+const int QUEUE_SIZE         = SAMPLES_PER_SECOND * SECONDS_QUEUED;
+
+
 //*** Delay for one pulse length ***
 #define PulseDelay delayMicroseconds( 5 );
 
@@ -19,17 +24,17 @@ const int SAMPLES_PER_WEIGHT = 4;
 //***********************************
 static void H_fallingEdgeISR();
 
-static HX711 *hx711_ = nullptr;
+//static HX711 *hx711_ = nullptr;
 
 //*** GPIO pins ***
 static int DT_Pin_  = 0;
 static int SCK_Pin_ = 0;
 
 //*** num samples left to collect ***
-static volatile int samplesToCollect_ = 0;
+//static volatile int samplesToCollect_ = 0;
 
 //*** array of sample values ***
-static QList<int> collectedData_;
+static QQueue<int> collectedData_;
 
 //*** flag to indicate that we are reading in data ***
 static volatile bool readingData_ = false;
@@ -60,10 +65,6 @@ HX711::HX711( int DT_GPIO, int SCK_GPIO, int rawTare, double scale )
     tare_    = rawTare;
     scale_   = scale;
 
-    curCollectMode_ = NO_MODE;
-
-    hx711_ = this;
-
     //*** ensure wiring pi library is set up for GPIO numbering ***
     wiringPiSetupGpio() ;
 
@@ -73,11 +74,6 @@ HX711::HX711( int DT_GPIO, int SCK_GPIO, int rawTare, double scale )
 
     //*** Set up interrupt Service Routine on falling edge of DT pin ***
     wiringPiISR( DT_GPIO, INT_EDGE_FALLING, H_fallingEdgeISR );
-
-    qRegisterMetaType<t_DataSet>("t_DataSet");
-
-    //*** connect to data complete signal ***
-    connect( this, SIGNAL(collectionComplete(t_DataSet)), SLOT(handleCollectionDone(t_DataSet)) );
 }
 
 
@@ -89,136 +85,56 @@ HX711::~HX711()
 }
 
 
+
 //*****************************************************************************
 //*****************************************************************************
-void HX711::handleCollectionDone( t_DataSet data )
+float HX711::getWeight()
 {
-double weightTotal = 0;
-long long rawTotal = 0;
-float weightVal = 0;
-int rawAverage = 0;
-int numSamples = data.size();
-int median = 0;
-int variant = 0;
+t_DataSet data;
+float totalWeight = 0.0;
 
-    //*** if raw mode, just pass back what we got ***
-    if ( curCollectMode_ == RAW_MODE )
+    //*** get samples for weight ***
+    collectProcessedData( SAMPLES_PER_WEIGHT, data );
+
+    //*** no data ***
+    if ( data.isEmpty() ) return -1.0;
+
+    //*** calculate average weight ***
+    foreach( int sample, data )
     {
-        curCollectMode_ = NO_MODE;
-
-        emit rawData( data );
-
-        //*** done ***
-        return;
+        totalWeight += ( ((double)sample - (double)tare_) * scale_ );
     }
 
-    //*** determine median value ***
-    qSort( data );
+    //*** compute the average weight ***
+    float weightVal = (float)( totalWeight / (float)data.size() );
 
-    int mid = numSamples / 2;
-    if ( (numSamples%2 == 0) )
-    {
-        //*** even # samples ***
-        median = ( data[mid] + data[mid-1] ) / 2;
-    }
-    else
-    {
-        //*** odd # samples ***
-        median = data[mid];
-    }
-
-    //*** determine variant threshold ***
-    variant = median / 10;
-
-    //*** remove outliers and add to total ***
-    for ( int i=0; i<numSamples; i++ )
-    {
-        int diff = abs( data[i] - median );
-        if ( diff > abs(variant) )
-        {
-            data[i] = median;
-        }
-
-        rawTotal += data[i];
-    }
-
-    //*** check mode ***
-    if ( curCollectMode_ == WEIGHT_MODE )
-    {
-        //*** calculate average weight ***
-        foreach( int sample, data )
-        {
-            weightTotal += ( ((double)sample - (double)tare_) * scale_ );
-        }
-
-        //*** compute the average weight ***
-        weightVal = (float)( weightTotal / (double)numSamples );
-
-        curCollectMode_ = NO_MODE;
-
-        emit weight( weightVal );
-    }
-
-    else if ( curCollectMode_ == RAW_AVG_MODE )
-    {
-        //*** determine raw average ***
-        rawAverage = (int)(rawTotal / numSamples );
-
-        curCollectMode_ = NO_MODE;
-
-        emit rawAvg( rawAverage );
-    }
+    return weightVal;
 }
 
 
 //*****************************************************************************
 //*****************************************************************************
-bool HX711::getWeight()
+int HX711::getRawAvg( int numSamples )
 {
-    //*** if we are currently collecting, return error ***
-    if ( samplesToCollect_ > 0 || curCollectMode_ != NO_MODE ) return false;
+t_DataSet data;
+long long totalVal = 0;
 
-    //*** set collect mode ***
-    curCollectMode_ = WEIGHT_MODE;
+    //*** get samples for weight ***
+    collectProcessedData( numSamples, data );
 
-    //*** request samples ***
-    samplesToCollect_ = SAMPLES_PER_WEIGHT;
+    //*** no data ***
+    if ( data.isEmpty() ) return 0;
 
-    return true;
-}
+    //*** calculate average value ***
+    foreach( int sample, data )
+    {
+        totalVal += sample;
+    }
 
+    //*** compute the average weight ***
+    int avgVal = (int)( totalVal / data.size() );
 
-//*****************************************************************************
-//*****************************************************************************
-bool HX711::collectRawData( int numSamples )
-{
-    //*** if we are currently collecting, return error ***
-    if ( samplesToCollect_ > 0 || curCollectMode_ != NO_MODE ) return false;
-
-    //*** set collect mode ***
-    curCollectMode_ = RAW_MODE;
-
-    //*** request samples ***
-    samplesToCollect_ = numSamples;
-
-    return true;
-}
-
-
-//*****************************************************************************
-//*****************************************************************************
-bool HX711::getRawAvg( int numSamples )
-{
-    //*** if we are currently collecting, return error ***
-    if ( samplesToCollect_ > 0 || curCollectMode_ != NO_MODE ) return false;
-
-    //*** set collect mode ***
-    curCollectMode_ = RAW_AVG_MODE;
-
-    //*** request samples ***
-    samplesToCollect_ = numSamples;
-
-    return true;
+    return avgVal;
 }
 
 
@@ -254,18 +170,81 @@ void HX711::setTare( int tareVal )
 
 //*****************************************************************************
 //*****************************************************************************
-void HX711::dataCollected()
+int HX711::collectRawData( int numSamples, t_DataSet &data )
 {
-    //*** grab a copy of the data ***
-    t_DataSet data = collectedData_;
+QQueue<int> samples;    // place to hold copy of collected data
 
-    //*** clear the data ***
-    collectedData_.clear();
+    //*** clear output data ***
+    data.clear();
 
-    //*** asynchronous notification ***
-    emit collectionComplete( data );
+    //*** get current queue size ***
+    int qSize = collectedData_.size();
+
+    // must have samples ***
+    if ( qSize == 0 ) return 0;
+
+    //*** copy data to minimize chance of it changing in the middle of processing ***
+    samples = collectedData_;
+
+    //*** use as many samples as we can get, up to requested amount ***
+    numSamples = qMin( qSize, numSamples );
+
+    //*** grab requested samples from end of queue and add to list ***
+    int lastIdx = qSize - 1;
+    int firstIdx = lastIdx  - numSamples + 1;
+    for ( int idx = firstIdx; idx <= lastIdx; idx++ )
+    {
+        data.append( samples[idx] );
+    }
+
+    return data.size();
+
 }
 
+
+//*****************************************************************************
+//*****************************************************************************
+int HX711::collectProcessedData(int numSamples, t_DataSet &data)
+{
+    //*** get raw samples ***
+    int actualNumSamples = collectRawData( numSamples, data );
+
+    //*** must have samples to do processing ***
+    if ( actualNumSamples < 1 ) return 0;
+
+    //*** determine median value ***
+    qSort( data );
+
+    int median = 0;
+    int variant = 0;
+    int mid = numSamples / 2;
+    if ( (numSamples%2 == 0) )
+    {
+        //*** even # samples ***
+        median = ( data[mid] + data[mid-1] ) / 2;
+    }
+    else
+    {
+        //*** odd # samples ***
+        median = data[mid];
+    }
+
+    //*** determine variant threshold ***
+    variant = median / 10;
+
+    //*** remove outliers ***
+    for ( int i=0; i<numSamples; i++ )
+    {
+        int diff = abs( data[i] - median );
+        if ( diff > abs(variant) )
+        {
+            //*** replace outlier with median value ***
+            data[i] = median;
+        }
+    }
+
+    return data.size();
+}
 
 
 //*****************************************************************************
@@ -279,7 +258,7 @@ const int NUM_BITS = 24;    // 24 bit A/D converter
 
     //*** make sure we are valid to read ***
     //*** reading flag should be reset and DT oin should be low ***
-    if ( samplesToCollect_ < 1 || readingData_ || digitalRead( DT_Pin_ ) == 1 ) return;
+    if ( readingData_ || digitalRead( DT_Pin_ ) == 1 ) return;
 
     //*** set reading flag ***
     readingData_ = true;
@@ -316,17 +295,13 @@ const int NUM_BITS = 24;    // 24 bit A/D converter
     PulseDelay
     digitalWrite( SCK_Pin_, LOW );
 
-    //*** handle data collection ***
-    collectedData_.append( -extendSign(sample) );
-    samplesToCollect_--;
+    //*** save data ***
+    collectedData_.enqueue( -extendSign(sample) );
+
+    //*** limit queue size - get rid of oldest data ***
+    while ( collectedData_.size() > QUEUE_SIZE ) collectedData_.dequeue();
 
     //*** reset flag ***
     readingData_ = false;
-
-    //*** if data collection complete, let object know ***
-    if ( samplesToCollect_ < 1 && hx711_ )
-    {
-        hx711_->dataCollected();
-    }
 }
 

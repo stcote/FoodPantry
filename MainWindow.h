@@ -22,7 +22,24 @@ typedef struct
     qint64 day;
 } t_CheckIn;
 
+typedef struct
+{
+    quint32 magic;
+    quint32 size;
+    quint32 type;
+    int     key;
+    float   weight;
+    qint64  day;
+} t_WeightReport;
+
+const int MAGIC_VAL = 0x3e3e3e3e;
+
 const int CHECKIN_SIZE = sizeof( t_CheckIn );
+
+const int WEIGHT_REPORT_SIZE = sizeof( t_WeightReport );
+const int WEIGHT_SIZE_FIELD = WEIGHT_REPORT_SIZE - ( 2 * sizeof(quint32) );
+const int WEIGHT_REPORT_TYPE = 0x0001;
+
 
 typedef enum { NOCAL_MODE, CAL_TARE_MODE, CAL_WEIGHT_MODE, TARE_MODE } CalMode;
 
@@ -65,8 +82,7 @@ private slots:
 
     void requestWeight();
 
-    void handleGetRawAvg( int rawAvg );
-    void handleGetWeight( float w );
+    void shutdownNow();
 
 
 private:
@@ -105,8 +121,14 @@ private:
     //*** TCP server ***
     QTcpServer *svr_;
 
+    //*** connected client ***
+    QTcpSocket *client_;
+
     //*** timer to display weight ***
     QTimer *weightTimer_;
+
+    //*** list of weight values ***
+    QList<float> weights_;
 
     //*** scale vars ***
     int tare_;
@@ -115,8 +137,6 @@ private:
     CalMode curCalMode_;
     int calTareVal_;
     int calWeightVal_;
-
-    float lastWeight_;
 
     //*** list of fake data for testing ***
     QList<t_CheckIn> fake_;

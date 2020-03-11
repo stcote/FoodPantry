@@ -2,16 +2,13 @@
 #define HX711_H
 
 #include <QList>
+#include <QQueue>
 
 typedef QList<int> t_DataSet;
 
-class HX711 : public QObject
+class HX711
 {
-    Q_OBJECT
-
 public:
-
-    enum CollectMode { NO_MODE, WEIGHT_MODE, RAW_MODE, RAW_AVG_MODE };
 
     //*** constructor ***
     HX711( int DT_GPIO, int SCK_GPIO, int rawTare, double scale );
@@ -20,47 +17,32 @@ public:
     ~HX711();
 
     //*** request the current scale weight ***
-    //*** signal 'weight()' at end
-    bool getWeight();
+    float getWeight();
+
+    //*** collect n samples  ***
+    int collectRawData( int numSamples, t_DataSet &data );
 
     //*** collect n samples - reject outliers ***
-    //*** signal 'rawData()' at end ***
-    bool collectRawData( int numSamples );
+    int collectProcessedData( int numSamples, t_DataSet &data );
 
     //*** get the raw average of n samples - reject outliers ***
-    //*** signal 'rawAvg()' at end ***
-    bool getRawAvg( int numSamples );
+    int getRawAvg( int numSamples );
 
-
+    //*** set the data used for calibration ***
     void setCalibrationData( int tareVal, int weightVal, float actualWeight );
 
+    //*** get the data derived from the calibration ***
     void getCalibrationData( int &rawTareValue, double &scaleValue );
 
+    //*** start using a new tare value ***
     void setTare( int tareVal );
-
-    //*** invoked by ISR when collection complete ***
-    void dataCollected();
-
-
-signals:
-
-    void weight( float wt );
-
-    void rawAvg( int avg );
-
-    void rawData( t_DataSet data );
-
-    //*** private signal ***
-    void collectionComplete( t_DataSet data );
-
-
-
-private slots:
-
-    void handleCollectionDone( t_DataSet data );
 
 
 private:
+
+    //*** gets the number of requested samples from the collected queue ***
+    //*** returns the number of samples actually retrieved ***
+    int getSamples( int numSamples, t_DataSet &data );
 
     //*** raw tare value (zero weight) ***
     int tare_;
@@ -69,41 +51,6 @@ private:
     //*** produced as part of calibration
     double scale_;
 
-    //*** current collection mode ***
-    CollectMode curCollectMode_;
-
 };
-
-#if 0
-   //************************
-   //*** Public Functions ***
-   //************************
-
-   void  HX711_init( int DT_Pin, int SC_Pin, int rawTare, double scale );
-
-   float HX711_getWeight();
-
-   int   HX711_getRawReading();
-
-   void  HX711_collectRawData( int numSamples, QList<int> &data );
-
-   int   HX711_getRawAverage(int numSamples , QList<int> &data );
-
-   void  HX711_setCalibrationData( int tareVal, int weightVal, float actualWeight );
-
-   void  HX711_getCalibrationData( int &rawTareValue, double &scaleValue );
-
-
-   //***********************
-   //*** local functions ***
-   //***********************
-
-   void H_pulseDelay();
-
-   int H_extendSign( int val );
-
-   //*** Interrupt Service Routine ***
-//   static void H_fallingEdgeISR();
-#endif
 
 #endif

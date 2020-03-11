@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include <stdlib.h>
 #include "ui_MainWindow.h"
 #include <QDate>
 #include <QTcpSocket>
@@ -42,8 +43,6 @@ const int NUM_TARE_SAMPLES = 4;
 
 const float BASKET_TARE = 3.5;
 
-const float INVALID_WEIGHT = -999;
-
 const int TOUCHSCREEN_Y = 480;
 
 //*****************************************************************************
@@ -61,8 +60,7 @@ MainWindow::MainWindow( QWidget *parent ) :
 
     connected_ = false;
     svr_ = nullptr;
-    curCalMode_ = NOCAL_MODE;
-    lastWeight_ = INVALID_WEIGHT;
+    client_ = nullptr;
 
     ui->weighBtn->setStyleSheet( "background-color: green" );
     ui->clearLastBtn->setStyleSheet( "background-color: red" );
@@ -84,6 +82,8 @@ MainWindow::MainWindow( QWidget *parent ) :
     connect( ui->shutdownBtn_2, SIGNAL(clicked()), SLOT(handleShutdown()) );
     connect( ui->cancelCalibrateBtn, SIGNAL(clicked()), SLOT(handleCancelCalibrate()) );
     connect( ui->continueBtn, SIGNAL(clicked()), SLOT(handleCalibrateContinue()) );
+
+    connect( ui->shutdownBtn, SIGNAL(clicked()), SLOT(shutdownNow()) );
 
     connect( ui->weighLbl_1, SIGNAL(clicked()), SLOT(handleTare()) );
     connect( ui->weighLbl_2, SIGNAL(clicked()), SLOT(handleTare()) );
@@ -124,7 +124,7 @@ MainWindow::MainWindow( QWidget *parent ) :
     if ( screenY == TOUCHSCREEN_Y )
     {
         //*** hide menu bar ***
-        ui->menuBar->hide();
+//        ui->menuBar->hide();
 
         //*** make frameless ***
         setWindowFlags( Qt::FramelessWindowHint );
@@ -242,39 +242,8 @@ QList<int> data;
 
     if ( curCalMode_ == CAL_TARE_MODE )
     {
-        //*** get average raw value for tare ***
-        hx711_->getRawAvg( NUM_CAL_SAMPLES );
-    }
-
-    else if ( curCalMode_ == CAL_WEIGHT_MODE )
-    {
-        //*** get average raw value for the weight ***
-        hx711_->getRawAvg( NUM_CAL_SAMPLES );
-    }
-}
-
-
-//*****************************************************************************
-//*****************************************************************************
-/**
- * @brief MainWindow::handleGetRawAvg
- * @param rawAvg
- */
-//*****************************************************************************
-void MainWindow::handleGetRawAvg( int rawAvg )
-{
-    if ( curCalMode_ == TARE_MODE )
-    {
-        tare_ = rawAvg;
-        hx711_->setTare( tare_ );
-        weightTimer_->start();
-        curCalMode_ = NOCAL_MODE;
-        qDebug() << "Set tare to : " << tare_;
-    }
-
-    else if ( curCalMode_ == CAL_TARE_MODE )
-    {
-        calTareVal_ = rawAvg;
+        //*** get tare ***
+        calTareVal_ = hx711_->getRawAvg( NUM_CAL_SAMPLES );
 
         ui->calibrateLbl->setText( CAL_STR_2 );
 
@@ -283,7 +252,8 @@ void MainWindow::handleGetRawAvg( int rawAvg )
 
     else if ( curCalMode_ == CAL_WEIGHT_MODE )
     {
-        calWeightVal_ = rawAvg;
+        //*** get average raw value for the weight ***
+        calWeightVal_ = hx711_->getRawAvg( NUM_CAL_SAMPLES );
 
         //*** set new calibration data ***
         hx711_->setCalibrationData( calTareVal_, calWeightVal_, CAL_WEIGHT );
@@ -358,6 +328,7 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
 
     //*** clear the weights ***
     ui->weightList->clear();
+    weights_.clear();
 
     //*** default to BASKET tare ***
     ui->basketBtn->setChecked( true );
@@ -376,9 +347,7 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
 void MainWindow::handleWeigh()
 {
     //*** read the scale ***
-    float weight = lastWeight_;
-
-    if ( weight == INVALID_WEIGHT ) weight = 0.0;
+    float weight = hx711_->getWeight();
 
     if ( ui->basketBtn->isChecked() )
     {
@@ -392,8 +361,11 @@ void MainWindow::handleWeigh()
     QString wLine;
     wLine.sprintf( "%.1lf", weight );
 
+    if ( wLine == "-0.0" ) wLine = "0.0";
+
     //*** add to the list of weights ***
     ui->weightList->addItem( wLine );
+    weights_.append( weight );
 }
 
 
@@ -410,6 +382,7 @@ void MainWindow::handleClearLast()
     {
         //*** delete the last row ***
         delete ui->weightList->takeItem( ui->weightList->count()-1 );
+        weights_.takeLast();
     }
 }
 
@@ -422,7 +395,39 @@ void MainWindow::handleClearLast()
 //*****************************************************************************
 void MainWindow::handleDone()
 {
+float totalWeight = 0.0;
+t_WeightReport wr;
+
     ui->widgetStack->setCurrentIndex( NAME_PAGE );
+
+    //*** if no weights, just restore name to list ***
+    if ( ui->weightList->count() == 0 )
+    {
+        ui->nameList->addItem( curName_ );
+        return;
+    }
+
+    //*** total the weight values ***
+    foreach( float w, weights_ )
+    {
+        totalWeight += w;
+    }
+
+    if ( connected_ && client_ )
+    {
+        //*** send weight report ***
+        memset( &wr, 0, WEIGHT_REPORT_SIZE );
+        wr.magic = MAGIC_VAL;
+        wr.size = WEIGHT_SIZE_FIELD;
+        wr.type = WEIGHT_REPORT_TYPE;
+
+        wr.key = clients_[curName_].key;
+        wr.weight = totalWeight;
+        wr.day = clients_[curName_].day;
+
+        client_->write( (char*)&wr, WEIGHT_REPORT_SIZE );
+    }
+
 }
 
 
@@ -435,15 +440,15 @@ void MainWindow::handleDone()
 void MainWindow::handleNewConnection()
 {
     //*** get pending connection ***
-    QTcpSocket *client = svr_->nextPendingConnection();
+    client_ = svr_->nextPendingConnection();
 
     //*** delete on disconnect ***
-    connect( client, &QAbstractSocket::disconnected, this, &MainWindow::handleDisconnect);
-    connect( client, &QAbstractSocket::disconnected, client, &QObject::deleteLater);
+    connect( client_, &QAbstractSocket::disconnected, this, &MainWindow::handleDisconnect);
+    connect( client_, &QAbstractSocket::disconnected, client_, &QObject::deleteLater);
 
-    connect( client, &QAbstractSocket::readyRead, this, &MainWindow::clientDataReady );
-    connect( client, SIGNAL(error(QAbstractSocket::SocketError)),
-                     SLOT(displayError( QAbstractSocket::SocketError )) );
+    connect( client_, &QAbstractSocket::readyRead, this, &MainWindow::clientDataReady );
+    connect( client_, SIGNAL(error(QAbstractSocket::SocketError)),
+                      SLOT(displayError( QAbstractSocket::SocketError )) );
 
     //*** handle connection ***
     handleConnect();
@@ -507,21 +512,14 @@ Q_UNUSED( socketError )
 //*****************************************************************************
 void MainWindow::handleTare()
 {
-    //*** indicate we are doing a tare ***
-    curCalMode_ = TARE_MODE;
+    //*** get the new tare value ***
+    tare_ = hx711_->getRawAvg( NUM_TARE_SAMPLES );
 
-    //*** stop auto timer ***
-    weightTimer_->stop();
+    //*** set it in the scale object ***
+    hx711_->setTare( tare_ );
 
-    QThread::msleep( 100 );
-
-    //*** request averge samples ***
-    qDebug() << "Getting tare";
-    while ( !hx711_->getRawAvg( NUM_TARE_SAMPLES ) )
-    {
-        qDebug() << "waiting...";
-        QThread::msleep( 100 );
-    }
+    //*** save current value ***
+    saveSettings();
 }
 
 
@@ -533,28 +531,30 @@ void MainWindow::handleTare()
 //*****************************************************************************
 void MainWindow::requestWeight()
 {
-    hx711_->getWeight();
+    //*** read the scale ***
+    float weight = hx711_->getWeight();
+
+    //*** format the weight ***
+    QString wLine;
+    wLine.sprintf( "%.1f", weight );
+
+    if ( wLine == "-0.0" ) wLine = "0.0";
+
+    ui->weighLbl_1->setText( wLine );
+    ui->weighLbl_2->setText( wLine );
+    ui->weighLbl_3->setText( wLine );
 }
 
 
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::displayError
- * @param socketError
+ * @brief MainWindow::shutdownNow
  */
 //*****************************************************************************
-void MainWindow::handleGetWeight( float w )
+void MainWindow::shutdownNow()
 {
-    //*** save last weight ***
-    lastWeight_ = w;
-
-    QString buf;
-    buf.sprintf( "%.1f", w );
-
-    ui->weighLbl_1->setText( buf );
-    ui->weighLbl_2->setText( buf );
-    ui->weighLbl_3->setText( buf );
+    system( " sudo shutdown -h now" );
 }
 
 
@@ -594,9 +594,6 @@ void MainWindow::setupServer()
 void MainWindow::setupScale()
 {
     hx711_ = new HX711( DT_PIN, SCK_PIN, tare_, scale_ );
-
-    connect( hx711_, SIGNAL(rawAvg(int)), SLOT(handleGetRawAvg(int)) );
-    connect( hx711_, SIGNAL(weight(float)), SLOT(handleGetWeight(float)) );
 }
 
 
