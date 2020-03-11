@@ -1,6 +1,10 @@
 #include "MainWindow.h"
-#include <stdlib.h>
 #include "ui_MainWindow.h"
+
+#include "KeyPad.h"
+#include "NameListDlg.h"
+
+#include <stdlib.h>
 #include <QDate>
 #include <QTcpSocket>
 #include <QSettings>
@@ -26,18 +30,19 @@ const QString APP_NAME = "FoodPantry";
 
 const QString TARE_STR  = "TARE";
 const QString SCALE_STR = "SCALE";
+const QString CALWT_STR = "CALWT";
 
 const int    DEFAULT_TARE  = -214054;
 const double DEFAULT_SCALE = 0.0000913017;
+const float  DEFAULT_CALWT = 10.0;
 
 const int DT_PIN = 21;
 const int SCK_PIN = 20;
 
 const QString CAL_STR_1 = "Empty Scale\nClick Continue";
-const QString CAL_STR_2 = "Add 10 lbs to scale\nClick Continue";
+const QString CAL_STR_2 = "Add %.1f lbs to scale\nClick Continue";
 const QString CAL_STR_3 = "Calibration Complete";
 
-const float CAL_WEIGHT = 10.0;
 const int NUM_CAL_SAMPLES = 10;
 const int NUM_TARE_SAMPLES = 4;
 
@@ -90,6 +95,10 @@ MainWindow::MainWindow( QWidget *parent ) :
     connect( ui->weighLbl_3, SIGNAL(clicked()), SLOT(handleTare()) );
 
     connect( ui->exitBtn, SIGNAL(clicked()), SLOT(close()) );
+    connect( ui->backBtn, SIGNAL(clicked()), SLOT(handleCancelCalibrate()) );
+    connect( ui->changeCalBtn, SIGNAL(clicked() ), SLOT(handleChangeCalWeight()) );
+    connect( ui->restoreNameBtn, SIGNAL(clicked()), SLOT(handleRestoreNameBtn()) );
+
 
     ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
 
@@ -132,6 +141,8 @@ MainWindow::MainWindow( QWidget *parent ) :
         //*** full screen ***
         showFullScreen();
     }
+
+    ui->restoreNameBtn->setEnabled( false );
 }
 
 
@@ -245,7 +256,9 @@ QList<int> data;
         //*** get tare ***
         calTareVal_ = hx711_->getRawAvg( NUM_CAL_SAMPLES );
 
-        ui->calibrateLbl->setText( CAL_STR_2 );
+        QString buf;
+        buf.sprintf( qPrintable(CAL_STR_2), calWeight_ );
+        ui->calibrateLbl->setText( buf );
 
         curCalMode_ = CAL_WEIGHT_MODE;
     }
@@ -256,7 +269,7 @@ QList<int> data;
         calWeightVal_ = hx711_->getRawAvg( NUM_CAL_SAMPLES );
 
         //*** set new calibration data ***
-        hx711_->setCalibrationData( calTareVal_, calWeightVal_, CAL_WEIGHT );
+        hx711_->setCalibrationData( calTareVal_, calWeightVal_, calWeight_ );
 
         //*** get and save new values ***
         hx711_->getCalibrationData( tare_, scale_ );
@@ -335,6 +348,10 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
 
     //*** remove the name from the list ***
     delete ui->nameList->takeItem( ui->nameList->row( item ) );
+
+    //*** add to list of previously used names ***
+    prevNames_.append( name );
+    ui->restoreNameBtn->setEnabled( true );
 }
 
 
@@ -403,7 +420,13 @@ t_WeightReport wr;
     //*** if no weights, just restore name to list ***
     if ( ui->weightList->count() == 0 )
     {
+        //*** add name back to list ***
         ui->nameList->addItem( curName_ );
+
+        //*** remove from 'previously used' list ***
+        prevNames_.removeAll( curName_ );
+        ui->restoreNameBtn->setEnabled( !prevNames_.isEmpty() );
+
         return;
     }
 
@@ -549,6 +572,62 @@ void MainWindow::requestWeight()
 //*****************************************************************************
 //*****************************************************************************
 /**
+ * @brief MainWindow::handleChangeCalWeight
+ */
+//*****************************************************************************
+void MainWindow::handleChangeCalWeight()
+{
+KeyPad dlg( "New Cal Weight" );
+float newVal = 0;
+const float MAX_CAL_WEIGHT = 50.0;
+
+    //*** display the keypad dialog ***
+    if ( dlg.exec() == QDialog::Accepted )
+    {
+        //*** get the value entered ***
+        newVal = dlg.getValue();
+
+        //*** if value is ok, save it ***
+        if ( newVal <= MAX_CAL_WEIGHT )
+        {
+            calWeight_ = newVal;
+            saveSettings();
+        }
+    }
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleRestoreNameBtn
+ */
+//*****************************************************************************
+void MainWindow::handleRestoreNameBtn()
+{
+NameListDlg dlg( prevNames_ );
+
+    //*** if we got here, we have at least one item in list ***
+    if ( dlg.exec() == QDialog::Accepted )
+    {
+        QString name = dlg.getName();
+
+        //*** if valid name ***
+        if ( !name.isEmpty() )
+        {
+            //*** add back to list of names ***
+            ui->nameList->addItem( name );
+
+            //*** remove from 'prev names' list ***
+            prevNames_.removeAll( name );
+        }
+    }
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
  * @brief MainWindow::shutdownNow
  */
 //*****************************************************************************
@@ -634,6 +713,9 @@ QSettings s;
 
     //*** scale value ***
     scale_ = s.value( SCALE_STR, DEFAULT_SCALE ).toDouble();
+
+    //*** cal weight setting ***
+    calWeight_ = s.value( CALWT_STR, DEFAULT_CALWT ).toFloat();
 }
 
 
@@ -650,7 +732,7 @@ QSettings s;
     //*** save values ***
     s.setValue( TARE_STR, tare_ );
     s.setValue( SCALE_STR, scale_ );
-
+    s.setValue( CALWT_STR, calWeight_ );
 }
 
 

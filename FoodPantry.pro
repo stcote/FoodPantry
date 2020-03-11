@@ -15,12 +15,18 @@ TEMPLATE = app
 SOURCES += main.cpp\
         MainWindow.cpp \
         HX711.cpp \
-    ClickLabel.cpp
+    ClickLabel.cpp \
+    KeyPad.cpp \
+    NameListDlg.cpp
 
 HEADERS  += MainWindow.h \
     HX711.h \
-    ClickLabel.h
+    ClickLabel.h \
+    KeyPad.h \
+    NameListDlg.h
 
-FORMS    += MainWindow.ui
+FORMS    += MainWindow.ui \
+    KeyPad.ui \
+    NameListDlg.ui
 
 LIBS += -lwiringPi

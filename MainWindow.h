@@ -82,6 +82,10 @@ private slots:
 
     void requestWeight();
 
+    void handleChangeCalWeight();
+
+    void handleRestoreNameBtn();
+
     void shutdownNow();
 
 
@@ -130,9 +134,13 @@ private:
     //*** list of weight values ***
     QList<float> weights_;
 
+    //*** list of previously used names ***
+    QStringList prevNames_;
+
     //*** scale vars ***
     int tare_;
     double scale_;
+    float calWeight_;
 
     CalMode curCalMode_;
     int calTareVal_;
