@@ -11,7 +11,6 @@
 #include <QGuiApplication>
 #include <QScreen>
 #include <QThread>
-#include <wiringPi.h>
 #include "HX711.h"
 
 //*** page constants ***
@@ -36,12 +35,11 @@ const int    DEFAULT_TARE  = -214054;
 const double DEFAULT_SCALE = 0.0000913017;
 const float  DEFAULT_CALWT = 10.0;
 
-const int DT_PIN = 21;
+const int DT_PIN  = 21;
 const int SCK_PIN = 20;
 
 const QString CAL_STR_1 = "Empty Scale\nClick Continue";
 const QString CAL_STR_2 = "Add %.1f lbs to scale\nClick Continue";
-const QString CAL_STR_3 = "Calibration Complete";
 
 const int NUM_CAL_SAMPLES = 10;
 const int NUM_TARE_SAMPLES = 4;
@@ -53,8 +51,8 @@ const int TOUCHSCREEN_Y = 480;
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::MainWindow
- * @param parent
+ * @brief MainWindow::MainWindow - Constructor
+ * @param parent - parent widget
  */
 //*****************************************************************************
 MainWindow::MainWindow( QWidget *parent ) :
@@ -63,15 +61,18 @@ MainWindow::MainWindow( QWidget *parent ) :
 {
     ui->setupUi(this);
 
-    connected_ = false;
-    svr_ = nullptr;
-    client_ = nullptr;
+    //*** initialize vars ***
+    connected_  = false;
+    svr_        = nullptr;
+    client_     = nullptr;
     curCalMode_ = NOCAL_MODE;
 
+    //*** button colors ***
     ui->weighBtn->setStyleSheet( "background-color: green" );
     ui->clearLastBtn->setStyleSheet( "background-color: red" );
     ui->doneBtn->setStyleSheet( "background-color: blue" );
 
+    //*** make connections ***
     connect( ui->actionConnect, SIGNAL(triggered()), SLOT(handleConnect()) );
     connect( ui->actionDisconnect, SIGNAL(triggered()), SLOT(handleDisconnect()) );
     connect( ui->actionAdd_name, SIGNAL(triggered()), SLOT(handleAddName()) );
@@ -100,7 +101,7 @@ MainWindow::MainWindow( QWidget *parent ) :
     connect( ui->changeCalBtn, SIGNAL(clicked() ), SLOT(handleChangeCalWeight()) );
     connect( ui->restoreNameBtn, SIGNAL(clicked()), SLOT(handleRestoreNameBtn()) );
 
-
+    //*** first page displayed ***
     ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
 
     //*** initialize for settings ***
@@ -118,8 +119,8 @@ MainWindow::MainWindow( QWidget *parent ) :
     weightTimer_->setInterval( WEIGHT_TIMER_MSEC );
     connect( weightTimer_, SIGNAL(timeout()), SLOT(requestWeight()) );
     QTimer::singleShot( 2000, weightTimer_, SLOT(start()) );
-//    weightTimer_->start();
 
+    //*** TODO - Remove after testing phase ***
     initFakeData();
 
     //*** set up the TCP server ***
@@ -144,6 +145,7 @@ MainWindow::MainWindow( QWidget *parent ) :
         showFullScreen();
     }
 
+    //*** desensitize 'restore name' button until we have a name to restore ***
     ui->restoreNameBtn->setEnabled( false );
 }
 
@@ -151,7 +153,7 @@ MainWindow::MainWindow( QWidget *parent ) :
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::~MainWindow
+ * @brief MainWindow::~MainWindow - Destructor
  */
 //*****************************************************************************
 MainWindow::~MainWindow()
@@ -161,7 +163,8 @@ MainWindow::~MainWindow()
 
     delete ui;
 
-    delete hx711_;
+    //*** scale object ***
+    if ( hx711_ ) delete hx711_;
 
     //*** TCP server ***
     if ( svr_ ) delete svr_;
@@ -174,13 +177,15 @@ MainWindow::~MainWindow()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleConnect
+ * @brief MainWindow::handleConnect - called when the checkin server connects
  */
 //*****************************************************************************
 void MainWindow::handleConnect()
 {
+    //*** display name list page ***
     ui->widgetStack->setCurrentIndex( NAME_PAGE );
 
+    //*** set flag to indicate we are connected ***
     connected_ = true;
 }
 
@@ -188,35 +193,44 @@ void MainWindow::handleConnect()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleDisconnect
+ * @brief MainWindow::handleDisconnect - called when the checkin server
+ *              disconnects
  */
 //*****************************************************************************
 void MainWindow::handleDisconnect()
 {
+    //*** display 'waiting to connect' page ***
     ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
 
+    //*** set flag to indicate we are no longer connected ***
     connected_ = false;
 }
 
 
+//*** TODO - remove after testing ***
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleAddName
+ * @brief MainWindow::handleAddName - For testing purposes only
  */
 //*****************************************************************************
 void MainWindow::handleAddName()
 {
 t_CheckIn ci;
 
+    //*** do we have more names in fake list? ***
     if ( !fake_.isEmpty() )
     {
+        //*** grab the first record ***
         ci = fake_.takeFirst();
 
+        //*** extract the name ***
         QString name = ci.name;
 
+        //*** add to map ***
         clients_[name] = ci;
 
+        //*** add to the name list ***
         ui->nameList->addItem( name );
     }
 }
@@ -225,18 +239,24 @@ t_CheckIn ci;
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleCalibrate
+ * @brief MainWindow::handleCalibrate - called when calibrate is requested
  */
 //*****************************************************************************
 void MainWindow::handleCalibrate()
 {
+    //*** ignore if we are already in calibration mode ***
     if ( curCalMode_ != NOCAL_MODE ) return;
 
+    //*** display the calibration page ***
     ui->widgetStack->setCurrentIndex( CALIBRATE_PAGE );
 
+    //*** display the first user prompt (empty scale) ***
     ui->calibrateLbl->setText( CAL_STR_1 );
+
+    //*** enter the TARE state ***
     curCalMode_ = CAL_TARE_MODE;
 
+    //*** no weight updates while we are doing this ***
     weightTimer_->stop();
 }
 
@@ -244,27 +264,34 @@ void MainWindow::handleCalibrate()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleCalibrateContinue
+ * @brief MainWindow::handleCalibrateContinue - called when the 'continue' button
+ *              is clicked during the calibration process. Handles the current
+ *              phase.
  */
 //*****************************************************************************
 void MainWindow::handleCalibrateContinue()
 {
 QList<int> data;
 
+    //*** ignore if not in calibration mode ***
     if ( curCalMode_ == NOCAL_MODE ) return;
 
+    //*** handle TARE mode ***
     if ( curCalMode_ == CAL_TARE_MODE )
     {
-        //*** get tare ***
+        //*** get tare raw value ***
         calTareVal_ = hx711_->getRawAvg( NUM_CAL_SAMPLES );
 
+        //*** create and display next user prompt (add weight to scale) ***
         QString buf;
         buf.sprintf( qPrintable(CAL_STR_2), calWeight_ );
         ui->calibrateLbl->setText( buf );
 
+        //*** enter CAL WEIGHT mode ***
         curCalMode_ = CAL_WEIGHT_MODE;
     }
 
+    //*** handle CAL WEIGHT mode ***
     else if ( curCalMode_ == CAL_WEIGHT_MODE )
     {
         //*** get average raw value for the weight ***
@@ -273,16 +300,17 @@ QList<int> data;
         //*** set new calibration data ***
         hx711_->setCalibrationData( calTareVal_, calWeightVal_, calWeight_ );
 
-        //*** get and save new values ***
+        //*** get and save new calculated values ***
         hx711_->getCalibrationData( tare_, scale_ );
         saveSettings();
 
-        ui->calibrateLbl->setText( CAL_STR_3 );
-
+        //*** exit calibration mode ***
         curCalMode_ = NOCAL_MODE;
 
+        //*** resume weight readings ***
         weightTimer_->start();
 
+        //*** exit appropriately ***
         handleCancelCalibrate();
     }
 }
@@ -291,31 +319,26 @@ QList<int> data;
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleShutdown
- */
-//*****************************************************************************
-void MainWindow::handleShutdown()
-{
-    ui->widgetStack->setCurrentIndex( SHUTDOWN_PAGE );
-}
-
-
-//*****************************************************************************
-//*****************************************************************************
-/**
- * @brief MainWindow::handleCancelCalibrate
+ * @brief MainWindow::handleCancelCalibrate - exits calibration mode. Determines
+ *              the current quiescent state and sets the appropriate display.
  */
 //*****************************************************************************
 void MainWindow::handleCancelCalibrate()
 {
+    //*** ensure we are out of calibration mode ***
     curCalMode_ = NOCAL_MODE;
 
+    //*** if we are connected to checkin client ***
     if ( connected_ )
     {
+        //*** display the name list page ***
         ui->widgetStack->setCurrentIndex( NAME_PAGE );
     }
+
+    //*** not currently connected to the checkin client ***
     else
     {
+        //*** display the 'waiting to connect' page ***
         ui->widgetStack->setCurrentIndex( CONNECT_PAGE );
     }
 }
@@ -324,8 +347,22 @@ void MainWindow::handleCancelCalibrate()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleNameSelected
- * @param item
+ * @brief MainWindow::handleShutdown - called when the 'shutdown' button is clicked
+ */
+//*****************************************************************************
+void MainWindow::handleShutdown()
+{
+    //*** display the 'Shutdown' page ***
+    ui->widgetStack->setCurrentIndex( SHUTDOWN_PAGE );
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::handleNameSelected - called when the user clicks on a
+ *              name in the name list.
+ * @param item - the item that was selected via the click
  */
 //*****************************************************************************
 void MainWindow::handleNameSelected( QListWidgetItem *item )
@@ -339,7 +376,7 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
     //*** set current name ***
     curName_ = name;
 
-    //*** display name at top of page ***
+    //*** display name at top of page along with # items ***
     QString txt = QString( "%1 ( %2 )" ).arg(name).arg(clients_[name].numItems);
     ui->nameLbl->setText( txt );
 
@@ -362,7 +399,8 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleWeigh
+ * @brief MainWindow::handleWeigh - called when the 'weigh' button is clicked.
+ *              Gets the current weight and adds to the list
  */
 //*****************************************************************************
 void MainWindow::handleWeigh()
@@ -370,18 +408,24 @@ void MainWindow::handleWeigh()
     //*** read the scale ***
     float weight = hx711_->getWeight();
 
+    //*** factor in basket? ***
     if ( ui->basketBtn->isChecked() )
     {
+        //*** subtract the weight of the basket ***
         weight -= BASKET_TARE;
+
+        //*** we shouldn't have a negative weight ***
         if ( weight < 0.0 )
         {
             weight = 0.0;
         }
     }
 
+    //*** format weight ***
     QString wLine;
     wLine.sprintf( "%.1lf", weight );
 
+    //*** no negative 0 weights ***
     if ( wLine == "-0.0" ) wLine = "0.0";
 
     //*** add to the list of weights ***
@@ -393,7 +437,8 @@ void MainWindow::handleWeigh()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleClearLast
+ * @brief MainWindow::handleClearLast - called when the 'clear last' button is
+ *              clicked. Removes the last collected weight from the list.
  */
 //*****************************************************************************
 void MainWindow::handleClearLast()
@@ -401,7 +446,7 @@ void MainWindow::handleClearLast()
     //*** must be at least one thing in list ***
     if ( ui->weightList->count() > 0 )
     {
-        //*** delete the last row ***
+        //*** delete the last row fro both the control and the list ***
         delete ui->weightList->takeItem( ui->weightList->count()-1 );
         weights_.takeLast();
     }
@@ -411,14 +456,17 @@ void MainWindow::handleClearLast()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleDone
+ * @brief MainWindow::handleDone - called when the 'Done' button is clicked.
+ *              Processes the collected weights for the person and sends the
+ *              data back to the checkin client.
  */
 //*****************************************************************************
 void MainWindow::handleDone()
 {
-float totalWeight = 0.0;
-t_WeightReport wr;
+float totalWeight = 0.0;    // accumulator
+t_WeightReport wr;          // message struct
 
+    //*** return to the name list display ***
     ui->widgetStack->setCurrentIndex( NAME_PAGE );
 
     //*** if no weights, just restore name to list ***
@@ -431,6 +479,7 @@ t_WeightReport wr;
         prevNames_.removeAll( curName_ );
         ui->restoreNameBtn->setEnabled( !prevNames_.isEmpty() );
 
+        //*** done ***
         return;
     }
 
@@ -440,6 +489,7 @@ t_WeightReport wr;
         totalWeight += w;
     }
 
+    //*** can we send message back to client? ***
     if ( connected_ && client_ )
     {
         //*** send weight report ***
@@ -452,16 +502,17 @@ t_WeightReport wr;
         wr.weight = totalWeight;
         wr.day = clients_[curName_].day;
 
+        //*** write it to client socket ***
         client_->write( (char*)&wr, WEIGHT_REPORT_SIZE );
     }
-
 }
 
 
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleNewConnection
+ * @brief MainWindow::handleNewConnection - called when a new client connection
+ *              is made to the TCP server.
  */
 //*****************************************************************************
 void MainWindow::handleNewConnection()
@@ -473,11 +524,12 @@ void MainWindow::handleNewConnection()
     connect( client_, &QAbstractSocket::disconnected, this, &MainWindow::handleDisconnect);
     connect( client_, &QAbstractSocket::disconnected, client_, &QObject::deleteLater);
 
+    //*** set up to receive data (and errors) ***
     connect( client_, &QAbstractSocket::readyRead, this, &MainWindow::clientDataReady );
     connect( client_, SIGNAL(error(QAbstractSocket::SocketError)),
                       SLOT(displayError( QAbstractSocket::SocketError )) );
 
-    //*** handle connection ***
+    //*** handle connection in UI ***
     handleConnect();
 }
 
@@ -485,12 +537,13 @@ void MainWindow::handleNewConnection()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::clientDataReady
+ * @brief MainWindow::clientDataReady - called when data is available on the
+ *              client socket.
  */
 //*****************************************************************************
 void MainWindow::clientDataReady()
 {
-t_CheckIn ci;
+t_CheckIn ci;   // checkin data struct
 
     //*** get socket that received data ***
     QTcpSocket *sock = (QTcpSocket*)sender();
@@ -498,6 +551,7 @@ t_CheckIn ci;
     //*** get data ***
     while ( sock->bytesAvailable() >= CHECKIN_SIZE )
     {
+        //*** read structs worth of data ***
         if ( sock->read( (char*)&ci, CHECKIN_SIZE ) == CHECKIN_SIZE )
         {
             //*** grab name ***
@@ -516,8 +570,8 @@ t_CheckIn ci;
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::displayError
- * @param socketError
+ * @brief MainWindow::displayError - called when a TCP error is detected
+ * @param socketError - the error that was detected
  */
 //*****************************************************************************
 void MainWindow::displayError( QAbstractSocket::SocketError socketError )
@@ -527,6 +581,8 @@ Q_UNUSED( socketError )
     //*** get socket that received error ***
     QTcpSocket *sock = static_cast<QTcpSocket*>(sender());
 
+    //*** TODO - report error somehow ***
+
     qDebug() << "Socket Error: " << sock->errorString();
 }
 
@@ -534,7 +590,7 @@ Q_UNUSED( socketError )
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleTare
+ * @brief MainWindow::handleTare - called when the user requests a new tare
  */
 //*****************************************************************************
 void MainWindow::handleTare()
@@ -553,7 +609,8 @@ void MainWindow::handleTare()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::requestWeight
+ * @brief MainWindow::requestWeight - called by the weight timer to update the
+ *              weight displays
  */
 //*****************************************************************************
 void MainWindow::requestWeight()
@@ -565,8 +622,10 @@ void MainWindow::requestWeight()
     QString wLine;
     wLine.sprintf( "%.1f", weight );
 
+    //*** no negative 0s ***
     if ( wLine == "-0.0" ) wLine = "0.0";
 
+    //*** update all the weight displays ***
     ui->weighLbl_1->setText( wLine );
     ui->weighLbl_2->setText( wLine );
     ui->weighLbl_3->setText( wLine );
@@ -576,14 +635,15 @@ void MainWindow::requestWeight()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleChangeCalWeight
+ * @brief MainWindow::handleChangeCalWeight - called when the user wants to
+ *              update the actual weight used for the calibration process.
  */
 //*****************************************************************************
 void MainWindow::handleChangeCalWeight()
 {
-KeyPad dlg( "Cal Weight", this );
-float newVal = 0;
-const float MAX_CAL_WEIGHT = 50.0;
+KeyPad dlg( "Cal Weight", this );   // dialog used for keypad entry
+float newVal = 0;                   // temp weight value
+const float MAX_CAL_WEIGHT = 50.0;  // sanity check value
 
     //*** display the keypad dialog ***
     if ( dlg.exec() == QDialog::Accepted )
@@ -604,16 +664,18 @@ const float MAX_CAL_WEIGHT = 50.0;
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::handleRestoreNameBtn
+ * @brief MainWindow::handleRestoreNameBtn - called when the user wants to
+ *              restore a previously used name.
  */
 //*****************************************************************************
 void MainWindow::handleRestoreNameBtn()
 {
-NameListDlg dlg( prevNames_ );
+NameListDlg dlg( prevNames_ );  // dialog that displays names
 
     //*** if we got here, we have at least one item in list ***
     if ( dlg.exec() == QDialog::Accepted )
     {
+        //*** get selected name from dialog ***
         QString name = dlg.getName();
 
         //*** if valid name ***
@@ -632,11 +694,13 @@ NameListDlg dlg( prevNames_ );
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::shutdownNow
+ * @brief MainWindow::shutdownNow - called when the user wants to shut down
+ *          the Pi.
  */
 //*****************************************************************************
 void MainWindow::shutdownNow()
 {
+    //*** request shutdown from the OS ***
     system( " sudo shutdown -h now" );
 }
 
@@ -644,7 +708,8 @@ void MainWindow::shutdownNow()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::setupServer
+ * @brief MainWindow::setupServer - Sets up the TCP server, which waits for
+ *              incoming TCP connections from the checkin serve
  */
 //*****************************************************************************
 void MainWindow::setupServer()
@@ -663,6 +728,7 @@ void MainWindow::setupServer()
     }
     else
     {
+        //*** handle incoming connections ***
         connect (svr_, &QTcpServer::newConnection, this, &MainWindow::handleNewConnection );
     }
 }
@@ -671,11 +737,12 @@ void MainWindow::setupServer()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::setupScale
+ * @brief MainWindow::setupScale - sets up the scale object
  */
 //*****************************************************************************
 void MainWindow::setupScale()
 {
+    //*** class that reads serial data from the hx711 board ***
     hx711_ = new HX711( DT_PIN, SCK_PIN, tare_, scale_ );
 }
 
@@ -683,8 +750,8 @@ void MainWindow::setupScale()
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::addClient
- * @param ci
+ * @brief MainWindow::addClient - adds a new incoming client to the map and ui
+ * @param ci - structure containing client info
  */
 //*****************************************************************************
 void MainWindow::addClient( t_CheckIn &ci )
@@ -697,6 +764,7 @@ void MainWindow::addClient( t_CheckIn &ci )
     {
         clients_[name] = ci;
 
+        //*** add to ui names list ***
         ui->nameList->addItem( name );
     }
 }
@@ -705,12 +773,12 @@ void MainWindow::addClient( t_CheckIn &ci )
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::loadSettings
+ * @brief MainWindow::loadSettings - loads the various saved settings
  */
 //*****************************************************************************
 void MainWindow::loadSettings()
 {
-QSettings s;
+QSettings s;    // settings object - uses app names set in constructor
 
     //*** tare value ***
     tare_ = s.value( TARE_STR, DEFAULT_TARE ).toInt();
@@ -726,12 +794,12 @@ QSettings s;
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::saveSettings
+ * @brief MainWindow::saveSettings - saves the various settings values
  */
 //*****************************************************************************
 void MainWindow::saveSettings()
 {
-QSettings s;
+QSettings s;    // settings object - uses app names set in constructor
 
     //*** save values ***
     s.setValue( TARE_STR, tare_ );
@@ -740,10 +808,12 @@ QSettings s;
 }
 
 
+//*** TODO - remove after initial testing ***
 //*****************************************************************************
 //*****************************************************************************
 /**
- * @brief MainWindow::initFakeData
+ * @brief MainWindow::initFakeData - used to simulate data received from
+ *              checkin server
  */
 //*****************************************************************************
 void MainWindow::initFakeData()

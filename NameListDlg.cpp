@@ -77,5 +77,6 @@ QString retName;
 //*****************************************************************************
 void NameListDlg::selectionChanged()
 {
+    //*** enable the OK button when there is a selection ***
     ui->okBtn->setEnabled( !ui->nameList->selectedItems().isEmpty() );
 }
