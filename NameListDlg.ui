@@ -24,11 +24,6 @@
      <property name="alternatingRowColors">
       <bool>true</bool>
      </property>
-     <item>
-      <property name="text">
-       <string>Cote, Steven</string>
-      </property>
-     </item>
     </widget>
    </item>
    <item>

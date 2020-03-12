@@ -28,8 +28,6 @@ private slots:
 
     void selectionChanged();
 
-    void handleOK();
-
 private:
     Ui::NameListDlg *ui;
 };

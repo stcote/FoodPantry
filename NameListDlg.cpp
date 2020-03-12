@@ -27,8 +27,8 @@ NameListDlg::NameListDlg( QStringList &list, QWidget *parent ) :
     //*** connect to change in selection ***
     connect( ui->nameList, SIGNAL(itemSelectionChanged()), SLOT(selectionChanged()) );
 
-    connect( ui->okBtn, SIGNAL(clicked()), SLOT(accepted()) );
-    connect( ui->cancelBtn, SIGNAL(clicked()), SLOT(rejected()) );
+    connect( ui->okBtn, SIGNAL(clicked()), SLOT(accept()) );
+    connect( ui->cancelBtn, SIGNAL(clicked()), SLOT(reject()) );
 }
 
 

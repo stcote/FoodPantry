@@ -29,7 +29,7 @@ private slots:
 
     void handleNumClick( int val );
     void handleDel();
-    void handleClear();
+    void handleDec();
 
 signals:
       void clicked( int val );

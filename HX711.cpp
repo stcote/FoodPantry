@@ -210,7 +210,7 @@ int HX711::collectProcessedData(int numSamples, t_DataSet &data)
     int actualNumSamples = collectRawData( numSamples, data );
 
     //*** must have samples to do processing ***
-    if ( actualNumSamples < 1 ) return 0;
+    if ( actualNumSamples < 2 ) return 0;
 
     //*** determine median value ***
     qSort( data );

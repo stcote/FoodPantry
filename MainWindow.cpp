@@ -66,6 +66,7 @@ MainWindow::MainWindow( QWidget *parent ) :
     connected_ = false;
     svr_ = nullptr;
     client_ = nullptr;
+    curCalMode_ = NOCAL_MODE;
 
     ui->weighBtn->setStyleSheet( "background-color: green" );
     ui->clearLastBtn->setStyleSheet( "background-color: red" );
@@ -116,7 +117,8 @@ MainWindow::MainWindow( QWidget *parent ) :
     weightTimer_ = new QTimer( this );
     weightTimer_->setInterval( WEIGHT_TIMER_MSEC );
     connect( weightTimer_, SIGNAL(timeout()), SLOT(requestWeight()) );
-    weightTimer_->start();
+    QTimer::singleShot( 2000, weightTimer_, SLOT(start()) );
+//    weightTimer_->start();
 
     initFakeData();
 
@@ -306,6 +308,8 @@ void MainWindow::handleShutdown()
 //*****************************************************************************
 void MainWindow::handleCancelCalibrate()
 {
+    curCalMode_ = NOCAL_MODE;
+
     if ( connected_ )
     {
         ui->widgetStack->setCurrentIndex( NAME_PAGE );
@@ -577,7 +581,7 @@ void MainWindow::requestWeight()
 //*****************************************************************************
 void MainWindow::handleChangeCalWeight()
 {
-KeyPad dlg( "New Cal Weight" );
+KeyPad dlg( "Cal Weight", this );
 float newVal = 0;
 const float MAX_CAL_WEIGHT = 50.0;
 

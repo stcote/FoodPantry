@@ -18,10 +18,10 @@ KeyPad::KeyPad(QString title, QWidget *parent ) :
 {
 QList<QPushButton*> btns;
 
+    ui->setupUi(this);
+
     btns << ui->btn_0 << ui->btn_1 << ui->btn_2 << ui->btn_3 << ui->btn_4
          << ui->btn_5 << ui->btn_6 << ui->btn_7 << ui->btn_8 << ui->btn_9;
-
-    ui->setupUi(this);
 
     //*** set up signal mapper ***
     mapper_ = new QSignalMapper( this );
@@ -35,7 +35,7 @@ QList<QPushButton*> btns;
 
     //*** other buttons ***
     connect( ui->delBtn,    SIGNAL(clicked()), SLOT(handleDel()) );
-    connect( ui->clrBtn,    SIGNAL(clicked()), SLOT(handleClear()) );
+    connect( ui->decBtn,    SIGNAL(clicked()), SLOT(handleDec()) );
     connect( ui->okBtn,     SIGNAL(clicked()), SLOT(accept()) );
     connect( ui->cancelBtn, SIGNAL(clicked()), SLOT(reject()) );
 
@@ -95,8 +95,8 @@ void KeyPad::handleDel()
  * @brief KeyPad::handleClear
  */
 //*****************************************************************************
-void KeyPad::handleClear()
+void KeyPad::handleDec()
 {
-    valStr_.clear();
+    valStr_ += '.';
     ui->dataLbl->setText( valStr_ );
 }
