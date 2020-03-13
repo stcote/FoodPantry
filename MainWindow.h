@@ -104,6 +104,9 @@ private:
     void loadSettings();
     void saveSettings();
 
+    //*** display the cal weight in the change button ***
+    void displayCalWeight();
+
     //*** initialize the fake data for testing ***
     void initFakeData();
 

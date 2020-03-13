@@ -18,7 +18,7 @@
     <item>
      <widget class="QStackedWidget" name="widgetStack">
       <property name="currentIndex">
-       <number>4</number>
+       <number>3</number>
       </property>
       <widget class="QWidget" name="connectPage">
        <layout class="QVBoxLayout" name="verticalLayout_2" stretch="1,0">
@@ -1355,7 +1355,7 @@ Connection</string>
        </layout>
       </widget>
       <widget class="QWidget" name="calibratePage">
-       <layout class="QVBoxLayout" name="verticalLayout_7" stretch="2,2,1">
+       <layout class="QVBoxLayout" name="verticalLayout_7" stretch="2,3,1">
         <property name="spacing">
          <number>30</number>
         </property>
@@ -1404,14 +1404,14 @@ click CONTINUE</string>
           <item>
            <widget class="QPushButton" name="changeCalBtn">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+             <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
             <property name="minimumSize">
              <size>
-              <width>330</width>
+              <width>420</width>
               <height>60</height>
              </size>
             </property>
@@ -1427,7 +1427,7 @@ click CONTINUE</string>
              </font>
             </property>
             <property name="text">
-             <string>Change Cal Weight</string>
+             <string>Change Cal Weight ( 10.0 )</string>
             </property>
            </widget>
           </item>
@@ -1447,7 +1447,7 @@ click CONTINUE</string>
           <item>
            <widget class="QPushButton" name="cancelCalibrateBtn">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+             <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>

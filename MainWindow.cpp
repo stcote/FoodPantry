@@ -147,6 +147,9 @@ MainWindow::MainWindow( QWidget *parent ) :
 
     //*** desensitize 'restore name' button until we have a name to restore ***
     ui->restoreNameBtn->setEnabled( false );
+
+    //*** Add cal weight to button ***
+    displayCalWeight();
 }
 
 
@@ -656,6 +659,7 @@ const float MAX_CAL_WEIGHT = 50.0;  // sanity check value
         {
             calWeight_ = newVal;
             saveSettings();
+            displayCalWeight();
         }
     }
 }
@@ -805,6 +809,22 @@ QSettings s;    // settings object - uses app names set in constructor
     s.setValue( TARE_STR, tare_ );
     s.setValue( SCALE_STR, scale_ );
     s.setValue( CALWT_STR, calWeight_ );
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::displayCalWeight - display the cal weight in the change
+ *              button.
+ */
+//*****************************************************************************
+void MainWindow::displayCalWeight()
+{
+QString buf;
+
+    buf.sprintf( "Change Cal Weight ( %.1f )", calWeight_ );
+    ui->changeCalBtn->setText( buf );
 }
 
 
