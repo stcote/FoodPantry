@@ -470,6 +470,8 @@ t_WeightReport wr;          // message struct
     //*** return to the name list display ***
     ui->widgetStack->setCurrentIndex( NAME_PAGE );
 
+    ui->restoreNameBtn->setEnabled( true );
+
     //*** if no weights, just restore name to list ***
     if ( ui->weightList->count() == 0 )
     {
@@ -489,6 +491,8 @@ t_WeightReport wr;          // message struct
     //*** can we send message back to client? ***
     if ( connected_ && client_ )
     {
+        qDebug() << "Writing data to client...";
+
         //*** send weight report ***
         memset( &wr, 0, WEIGHT_REPORT_SIZE );
         wr.magic = MAGIC_VAL;
