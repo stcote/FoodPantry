@@ -21,6 +21,9 @@ NameListDlg::NameListDlg( QStringList &list, QWidget *parent ) :
         ui->nameList->addItem( name );
     }
 
+    setStyleSheet(  "QPushButton { background-color: blue; color: white; border: off; } "
+                    "QScrollBar:vertical { width: 50px; }" );
+
     //*** disable OK until selection is made ***
     ui->okBtn->setEnabled( false );
 

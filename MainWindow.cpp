@@ -11,6 +11,7 @@
 #include <QGuiApplication>
 #include <QScreen>
 #include <QThread>
+#include <QScrollBar>
 #include "HX711.h"
 
 //*** page constants ***
@@ -68,9 +69,8 @@ MainWindow::MainWindow( QWidget *parent ) :
     curCalMode_ = NOCAL_MODE;
 
     //*** button colors ***
-    ui->weighBtn->setStyleSheet( "background-color: green" );
-    ui->clearLastBtn->setStyleSheet( "background-color: red" );
-    ui->doneBtn->setStyleSheet( "background-color: blue" );
+    setStyleSheet(  "QPushButton { background-color: blue; color: white; border: off; } "
+                    "QScrollBar:vertical { width: 50px; }" );
 
     //*** make connections ***
     connect( ui->actionConnect, SIGNAL(triggered()), SLOT(handleConnect()) );
@@ -235,6 +235,8 @@ t_CheckIn ci;
 
         //*** add to the name list ***
         ui->nameList->addItem( name );
+        allNames_.append( name );
+        ui->restoreNameBtn->setEnabled( true );
     }
 }
 
@@ -392,10 +394,6 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
 
     //*** remove the name from the list ***
     delete ui->nameList->takeItem( ui->nameList->row( item ) );
-
-    //*** add to list of previously used names ***
-    prevNames_.append( name );
-    ui->restoreNameBtn->setEnabled( true );
 }
 
 
@@ -477,10 +475,6 @@ t_WeightReport wr;          // message struct
     {
         //*** add name back to list ***
         ui->nameList->addItem( curName_ );
-
-        //*** remove from 'previously used' list ***
-        prevNames_.removeAll( curName_ );
-        ui->restoreNameBtn->setEnabled( !prevNames_.isEmpty() );
 
         //*** done ***
         return;
@@ -565,6 +559,7 @@ t_CheckIn ci;   // checkin data struct
 
             //*** display on name screen ***
             ui->nameList->addItem( name );
+            allNames_.append( name );
         }
     }
 }
@@ -674,7 +669,14 @@ const float MAX_CAL_WEIGHT = 50.0;  // sanity check value
 //*****************************************************************************
 void MainWindow::handleRestoreNameBtn()
 {
-NameListDlg dlg( prevNames_ );  // dialog that displays names
+    QStringList dlgNames;
+
+    foreach( QString n, allNames_ )
+    {
+        if ( ui->nameList->findItems( n, Qt::MatchFixedString ).isEmpty() ) dlgNames.append( n );
+    }
+
+    NameListDlg dlg( dlgNames );  // dialog that displays names
 
     //*** if we got here, we have at least one item in list ***
     if ( dlg.exec() == QDialog::Accepted )
@@ -682,14 +684,11 @@ NameListDlg dlg( prevNames_ );  // dialog that displays names
         //*** get selected name from dialog ***
         QString name = dlg.getName();
 
-        //*** if valid name ***
+        //*** if valid name and not in list ***
         if ( !name.isEmpty() )
         {
             //*** add back to list of names ***
             ui->nameList->addItem( name );
-
-            //*** remove from 'prev names' list ***
-            prevNames_.removeAll( name );
         }
     }
 }

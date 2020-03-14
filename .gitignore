@@ -39,4 +39,6 @@ ui_*
 moc_*
 FoodPantry
 deploy/*
+*.saved
+
 

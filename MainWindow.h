@@ -138,7 +138,7 @@ private:
     QList<float> weights_;
 
     //*** list of previously used names ***
-    QStringList prevNames_;
+    QStringList allNames_;
 
     //*** scale vars ***
     int tare_;
