@@ -36,6 +36,8 @@ const int    DEFAULT_TARE  = -214054;
 const double DEFAULT_SCALE = 0.0000913017;
 const float  DEFAULT_CALWT = 10.0;
 
+const float  MIN_VALID_WEIGHT = 0.5;
+
 const int DT_PIN  = 21;
 const int SCK_PIN = 20;
 
@@ -488,11 +490,9 @@ t_WeightReport wr;          // message struct
         totalWeight += w;
     }
 
-    //*** can we send message back to client? ***
-    if ( connected_ && client_ )
+    //*** can we send message back to client? ( must have a valid weight ) ***
+    if ( connected_ && client_ && (totalWeight > MIN_VALID_WEIGHT) )
     {
-        qDebug() << "Writing data to client...";
-
         //*** send weight report ***
         memset( &wr, 0, WEIGHT_REPORT_SIZE );
         wr.magic = MAGIC_VAL;
@@ -558,12 +558,30 @@ t_CheckIn ci;   // checkin data struct
             //*** grab name ***
             QString name = ci.name;
 
-            //*** add to map ***
-            clients_[name] = ci;
+            //*** if # items > 0, then add to list ***
+            if ( ci.numItems != 0 )
+            {
+                //*** add to map ***
+                clients_[name] = ci;
 
-            //*** display on name screen ***
-            ui->nameList->addItem( name );
-            allNames_.append( name );
+                //*** display on name screen ***
+                ui->nameList->addItem( name );
+                allNames_.append( name );
+            }
+
+            //*** if numItems == 0, then remove from list ***
+            else
+            {
+                //*** remove the name from the list ***
+                QList<QListWidgetItem *>items = ui->nameList->findItems( name, Qt::MatchFixedString );
+                if ( !items.isEmpty() )
+                {
+                    delete ui->nameList->takeItem( ui->nameList->row( items[0] ) );
+                }
+                //*** remove all traces ***
+                allNames_.removeAll( name );
+                clients_.remove( name );
+            }
         }
     }
 }
