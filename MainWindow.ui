@@ -1007,7 +1007,7 @@ Connection</string>
           </property>
           <property name="font">
            <font>
-            <pointsize>48</pointsize>
+            <pointsize>32</pointsize>
            </font>
           </property>
           <property name="sizeAdjustPolicy">
