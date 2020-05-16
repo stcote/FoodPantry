@@ -1024,7 +1024,7 @@ Connection</string>
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_2">
           <item>
-           <widget class="QPushButton" name="calibrateBtn_2">
+           <widget class="QPushButton" name="shutdownBtn_2">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -1033,7 +1033,7 @@ Connection</string>
             </property>
             <property name="minimumSize">
              <size>
-              <width>200</width>
+              <width>230</width>
               <height>80</height>
              </size>
             </property>
@@ -1043,7 +1043,7 @@ Connection</string>
              </font>
             </property>
             <property name="text">
-             <string>Calibrate</string>
+             <string>Menu</string>
             </property>
            </widget>
           </item>
@@ -1110,7 +1110,7 @@ Connection</string>
            </spacer>
           </item>
           <item>
-           <widget class="QPushButton" name="shutdownBtn_2">
+           <widget class="QPushButton" name="restoreNameBtn">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -1119,7 +1119,7 @@ Connection</string>
             </property>
             <property name="minimumSize">
              <size>
-              <width>200</width>
+              <width>230</width>
               <height>80</height>
              </size>
             </property>
@@ -1129,7 +1129,7 @@ Connection</string>
              </font>
             </property>
             <property name="text">
-             <string>Shutdown</string>
+             <string>Restore Name</string>
             </property>
            </widget>
           </item>
@@ -1602,7 +1602,7 @@ click CONTINUE</string>
            </spacer>
           </item>
           <item>
-           <widget class="QPushButton" name="restoreNameBtn">
+           <widget class="QPushButton" name="calibrateBtn_2">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -1627,7 +1627,7 @@ click CONTINUE</string>
              </font>
             </property>
             <property name="text">
-             <string>Restore Name</string>
+             <string>Calibrate</string>
             </property>
            </widget>
           </item>

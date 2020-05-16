@@ -138,7 +138,7 @@ MainWindow::MainWindow( QWidget *parent ) :
     if ( screenY == TOUCHSCREEN_Y )
     {
         //*** hide menu bar ***
-//        ui->menuBar->hide();
+        ui->menuBar->hide();
 
         //*** make frameless ***
         setWindowFlags( Qt::FramelessWindowHint );
