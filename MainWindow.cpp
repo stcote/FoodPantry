@@ -73,6 +73,8 @@ MainWindow::MainWindow( QWidget *parent ) :
     //*** button colors ***
     setStyleSheet(  "QPushButton { background-color: blue; color: white; border: off; } "
                     "QScrollBar:vertical { width: 50px; }" );
+    ui->exitBtn->setStyleSheet(  "QPushButton { background-color: red; color: white; border: off; } " );
+
 
     //*** make connections ***
     connect( ui->actionConnect, SIGNAL(triggered()), SLOT(handleConnect()) );
