@@ -231,16 +231,8 @@ t_CheckIn ci;
         //*** grab the first record ***
         ci = fake_.takeFirst();
 
-        //*** extract the name ***
-        QString name = ci.name;
-
-        //*** add to map ***
-        clients_[name] = ci;
-
-        //*** add to the name list ***
-        addToNameList( name );
-        allNames_.append( name );
-        ui->restoreNameBtn->setEnabled( true );
+        //*** add this client ***
+        addClient( ci );
     }
 }
 
@@ -474,8 +466,6 @@ t_WeightReport wr;          // message struct
     //*** return to the name list display ***
     ui->widgetStack->setCurrentIndex( NAME_PAGE );
 
-    ui->restoreNameBtn->setEnabled( true );
-
     //*** if no weights, just restore name to list ***
     if ( ui->weightList->count() == 0 )
     {
@@ -563,12 +553,7 @@ t_CheckIn ci;   // checkin data struct
             //*** if # items > 0, then add to list ***
             if ( ci.numItems != 0 )
             {
-                //*** add to map ***
-                clients_[name] = ci;
-
-                //*** display on name screen ***
-                addToNameList( name );
-                allNames_.append( name );
+                addClient( ci );
             }
 
             //*** if numItems == 0, then remove from list ***
@@ -692,7 +677,7 @@ void MainWindow::handleRestoreNameBtn()
 {
     QStringList dlgNames;
 
-    //*** check ALL names ***
+    //*** find 'used' names to add to dialog ***
     foreach( QString n, allNames_ )
     {
         //*** if name not currently in person list, add to dialog list ***
@@ -702,6 +687,7 @@ void MainWindow::handleRestoreNameBtn()
         }
     }
 
+    //*** create the dialog ***
     NameListDlg dlg( dlgNames );  // dialog that displays names
 
     //*** if we got here, we have at least one item in list ***
@@ -793,7 +779,7 @@ void MainWindow::addClient( t_CheckIn &ci )
     {
         clients_[name] = ci;
 
-        //*** add to ui names list ***
+        //*** add to ui and 'all' names list ***
         addToNameList( name );
     }
 }
@@ -848,7 +834,7 @@ void MainWindow::displayCalWeight()
 {
 QString buf;
 
-    buf.sprintf( "Change Cal Weight ( %.1f )", calWeight_ );
+    buf.sprintf( "Change Cal Weight ( %.1f )", (double)calWeight_ );
     ui->changeCalBtn->setText( buf );
 }
 
@@ -866,6 +852,12 @@ void MainWindow::addToNameList( QString name )
     if ( !nameList_.contains( name ) )
     {
         nameList_.append( name );
+    }
+
+    //*** add to ALL here ***
+    if ( !allNames_.contains( name ) )
+    {
+        allNames_.append( name );
     }
 
     //*** redisplay ***
