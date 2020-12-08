@@ -904,6 +904,9 @@ void MainWindow::refreshNameList()
 
     //*** set the current list of names in the control ***
     ui->nameList->addItems( nameList_ );
+
+    //*** set 'restore' button state ***
+    ui->restoreNameBtn->setEnabled( nameList_.size() < allNames_.size() );
 }
 
 
