@@ -553,18 +553,19 @@ t_CheckIn ci;   // checkin data struct
             //*** if # items > 0, then add to list ***
             if ( ci.numItems != 0 )
             {
+                //*** add to map and name list ***
                 addClient( ci );
             }
 
             //*** if numItems == 0, then remove from list ***
             else
             {
-                //*** remove from display ***
-                removeFromNameList( name );
-
                 //*** remove all traces ***
                 allNames_.removeAll( name );
                 clients_.remove( name );
+
+                //*** remove from display ***
+                removeFromNameList( name );
             }
         }
     }
@@ -778,10 +779,10 @@ void MainWindow::addClient( t_CheckIn &ci )
     if ( !clients_.contains( name ) )
     {
         clients_[name] = ci;
-
-        //*** add to ui and 'all' names list ***
-        addToNameList( name );
     }
+
+    //*** add to ui and 'all' names list ***
+    addToNameList( name );
 }
 
 
@@ -834,7 +835,7 @@ void MainWindow::displayCalWeight()
 {
 QString buf;
 
-    buf.sprintf( "Change Cal Weight ( %.1f )", (double)calWeight_ );
+    buf.sprintf( "Change Cal Weight ( %.1f )", calWeight_ );
     ui->changeCalBtn->setText( buf );
 }
 
