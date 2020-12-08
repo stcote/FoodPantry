@@ -238,7 +238,7 @@ t_CheckIn ci;
         clients_[name] = ci;
 
         //*** add to the name list ***
-        ui->nameList->addItem( name );
+        addToNameList( name );
         allNames_.append( name );
         ui->restoreNameBtn->setEnabled( true );
     }
@@ -397,7 +397,7 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
     ui->basketBtn->setChecked( true );
 
     //*** remove the name from the list ***
-    delete ui->nameList->takeItem( ui->nameList->row( item ) );
+    removeFromNameList( name );
 }
 
 
@@ -420,7 +420,7 @@ void MainWindow::handleWeigh()
         weight -= BASKET_TARE;
 
         //*** we shouldn't have a negative weight ***
-        if ( weight < 0.0 )
+        if ( weight < 0.0f )
         {
             weight = 0.0;
         }
@@ -428,7 +428,7 @@ void MainWindow::handleWeigh()
 
     //*** format weight ***
     QString wLine;
-    wLine.sprintf( "%.1lf", weight );
+    wLine.sprintf( "%.1f", weight );
 
     //*** no negative 0 weights ***
     if ( wLine == "-0.0" ) wLine = "0.0";
@@ -480,7 +480,7 @@ t_WeightReport wr;          // message struct
     if ( ui->weightList->count() == 0 )
     {
         //*** add name back to list ***
-        ui->nameList->addItem( curName_ );
+        addToNameList( curName_ );
 
         //*** done ***
         return;
@@ -567,19 +567,16 @@ t_CheckIn ci;   // checkin data struct
                 clients_[name] = ci;
 
                 //*** display on name screen ***
-                ui->nameList->addItem( name );
+                addToNameList( name );
                 allNames_.append( name );
             }
 
             //*** if numItems == 0, then remove from list ***
             else
             {
-                //*** remove the name from the list ***
-                QList<QListWidgetItem *>items = ui->nameList->findItems( name, Qt::MatchFixedString );
-                if ( !items.isEmpty() )
-                {
-                    delete ui->nameList->takeItem( ui->nameList->row( items[0] ) );
-                }
+                //*** remove from display ***
+                removeFromNameList( name );
+
                 //*** remove all traces ***
                 allNames_.removeAll( name );
                 clients_.remove( name );
@@ -695,9 +692,14 @@ void MainWindow::handleRestoreNameBtn()
 {
     QStringList dlgNames;
 
+    //*** check ALL names ***
     foreach( QString n, allNames_ )
     {
-        if ( ui->nameList->findItems( n, Qt::MatchFixedString ).isEmpty() ) dlgNames.append( n );
+        //*** if name not currently in person list, add to dialog list ***
+        if ( !nameList_.contains( n ) )
+        {
+            dlgNames.append( n );
+        }
     }
 
     NameListDlg dlg( dlgNames );  // dialog that displays names
@@ -712,7 +714,7 @@ void MainWindow::handleRestoreNameBtn()
         if ( !name.isEmpty() )
         {
             //*** add back to list of names ***
-            ui->nameList->addItem( name );
+            addToNameList( name );
         }
     }
 }
@@ -792,7 +794,7 @@ void MainWindow::addClient( t_CheckIn &ci )
         clients_[name] = ci;
 
         //*** add to ui names list ***
-        ui->nameList->addItem( name );
+        addToNameList( name );
     }
 }
 
@@ -848,6 +850,60 @@ QString buf;
 
     buf.sprintf( "Change Cal Weight ( %.1f )", calWeight_ );
     ui->changeCalBtn->setText( buf );
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::addToNameList - adds a name to the person list
+ * @param name - name to add
+ */
+//*****************************************************************************
+void MainWindow::addToNameList( QString name )
+{
+    //*** add if not already there ***
+    if ( !nameList_.contains( name ) )
+    {
+        nameList_.append( name );
+    }
+
+    //*** redisplay ***
+    refreshNameList();
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::removeFromNameList - removes a name from the person list
+ * @param name - name to remove
+ */
+//*****************************************************************************
+void MainWindow::removeFromNameList( QString name )
+{
+    //*** remove from the list ***
+    nameList_.removeAll( name );
+
+    //*** redisplay ***
+    refreshNameList();
+}
+
+
+//*****************************************************************************
+//*****************************************************************************
+/**
+ * @brief MainWindow::refreshNameList - redisplays the person list with the
+ *              current set of names
+ */
+//*****************************************************************************
+void MainWindow::refreshNameList()
+{
+    //*** clear the list control ***
+    ui->nameList->clear();
+
+    //*** set the current list of names in the control ***
+    ui->nameList->addItems( nameList_ );
 }
 
 

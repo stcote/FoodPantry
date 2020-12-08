@@ -107,6 +107,11 @@ private:
     //*** display the cal weight in the change button ***
     void displayCalWeight();
 
+    //*** name list manipulation ***
+    void addToNameList( QString name );
+    void removeFromNameList( QString name );
+    void refreshNameList();
+
     //*** initialize the fake data for testing ***
     void initFakeData();
 
@@ -139,6 +144,9 @@ private:
 
     //*** list of previously used names ***
     QStringList allNames_;
+
+    //*** list of names in person list ***
+    QStringList nameList_;
 
     //*** scale vars ***
     int tare_;
