@@ -72,7 +72,8 @@ MainWindow::MainWindow( QWidget *parent ) :
 
     //*** button colors ***
     setStyleSheet(  "QPushButton { background-color: blue; color: white; border: off; } "
-                    "QScrollBar:vertical { width: 50px; }" );
+                    "QScrollBar:vertical { width: 50px; } "
+                    "QPushButton:disabled { color: dark-grey }" );
     ui->exitBtn->setStyleSheet(  "QPushButton { background-color: red; color: white; border: off; } " );
 
 
