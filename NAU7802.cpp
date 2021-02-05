@@ -29,15 +29,6 @@ NAU7802::NAU7802( int rawTare, double scale )
     scale_   = scale;
     nau7802_ = 0;
 
-    //*** ensure wiring pi library is set up for GPIO numbering ***
-//    wiringPiSetupGpio() ;
-
-    //*** set up interrupt line from chip ***
-//    pinMode( interruptPin, INPUT );
-
-    //*** Set up interrupt Service Routine on falling edge of interrupt line ***
-//    wiringPiISR( interruptPin, INT_EDGE_FALLING, H_fallingEdgeISR );
-
     //*** now set up the nau7802 chip ***
     setup();
 
@@ -94,7 +85,7 @@ bool result = true;
 
     result &= calibrateAFE(); //Re-cal analog front end when we change gain, sample rate, or channel
 
-    qDebug() << "result:" << result;
+    qDebug() << "Setup result:" << result;
 
     return  result;
 }
@@ -107,7 +98,6 @@ float NAU7802::getWeight()
 {
 t_DataSet data;
 float totalWeight = 0.0;
-QString buf,buf2;
 
     //*** get samples for weight ***
     collectProcessedData( SAMPLES_PER_WEIGHT, data );
@@ -115,22 +105,14 @@ QString buf,buf2;
     //*** no data ***
     if ( data.isEmpty() ) return -1.0;
 
-    buf = "getWeight() ";
-
     //*** calculate average weight ***
     foreach( int sample, data )
     {
-        buf2.sprintf( "%.2lf ", ((double)sample - (double)tare_) * scale_ );
-        buf += buf2;
         totalWeight += ( ((double)sample - (double)tare_) * scale_ );
     }
 
     //*** compute the average weight ***
     float weightVal = (float)( totalWeight / (float)data.size() );
-
-    buf += " totalWeight: " + QString::number(totalWeight);
-    buf += " weightVal: " + QString::number(weightVal);
-    qDebug() << buf;
 
     return weightVal;
 }
@@ -197,15 +179,12 @@ void NAU7802::setTare( int tareVal )
 int NAU7802::collectRawData( int numSamples, t_DataSet &data )
 {
 QQueue<int> samples;    // place to hold copy of collected data
-QString buf;
 
     //*** clear output data ***
     data.clear();
 
     //*** get current queue size ***
     int qSize = collectedData_.size();
-
-    buf.sprintf( "Q: %d D: %d  ", qSize, data.size() );
 
     // must have samples ***
     if ( qSize == 0 ) return 0;
@@ -222,14 +201,9 @@ QString buf;
     for ( int idx = firstIdx; idx <= lastIdx; idx++ )
     {
         data.append( samples[idx] );
-
-        buf += QString::number( samples[idx] ) + " ";
     }
 
-    qDebug() << buf;
-
     return data.size();
-
 }
 
 
@@ -521,8 +495,6 @@ qint32 sample = 0;
     {
         //*** get the 24 bit sample ***
         sample = getReading();
-
-        qDebug() << sample;
 
         //*** save data ***
         collectedData_.enqueue( sample );
