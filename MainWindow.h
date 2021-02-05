@@ -6,7 +6,8 @@
 #include <QHash>
 #include <QTcpServer>
 #include <QTimer>
-#include "HX711.h"
+//#include "HX711.h"
+#include "NAU7802.h"
 
 namespace Ui {
 class MainWindow;
@@ -119,7 +120,8 @@ private:
     Ui::MainWindow *ui;
 
     //*** scale reader object ***
-    HX711 *hx711_;
+//    HX711 *hx711_;
+    NAU7802 *nau7802_;
 
     //*** map client name to client data ***
     QHash<QString,t_CheckIn> clients_;

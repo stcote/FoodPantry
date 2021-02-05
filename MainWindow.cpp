@@ -12,7 +12,6 @@
 #include <QScreen>
 #include <QThread>
 #include <QScrollBar>
-#include "HX711.h"
 
 //*** page constants ***
 const int CONNECT_PAGE   = 0;
@@ -23,7 +22,7 @@ const int SHUTDOWN_PAGE  = 4;
 
 const quint16 SCALE_PORT = 29456;
 
-const int WEIGHT_TIMER_MSEC = 333;
+const int WEIGHT_TIMER_MSEC = 250;
 
 const QString ORG_NAME = "FoodPantry";
 const QString APP_NAME = "FoodPantry";
@@ -37,9 +36,6 @@ const double DEFAULT_SCALE = 0.0000913017;
 const float  DEFAULT_CALWT = 10.0;
 
 const float  MIN_VALID_WEIGHT = 0.5;
-
-const int DT_PIN  = 21;
-const int SCK_PIN = 20;
 
 const QString CAL_STR_1 = "Empty Scale\nClick Continue";
 const QString CAL_STR_2 = "Add %.1f lbs to scale\nClick Continue";
@@ -172,7 +168,7 @@ MainWindow::~MainWindow()
     delete ui;
 
     //*** scale object ***
-    if ( hx711_ ) delete hx711_;
+    if ( nau7802_ ) delete nau7802_;
 
     //*** TCP server ***
     if ( svr_ ) delete svr_;
@@ -282,7 +278,7 @@ QList<int> data;
     if ( curCalMode_ == CAL_TARE_MODE )
     {
         //*** get tare raw value ***
-        calTareVal_ = hx711_->getRawAvg( NUM_CAL_SAMPLES );
+        calTareVal_ = nau7802_->getRawAvg( NUM_CAL_SAMPLES );
 
         //*** create and display next user prompt (add weight to scale) ***
         QString buf;
@@ -297,13 +293,13 @@ QList<int> data;
     else if ( curCalMode_ == CAL_WEIGHT_MODE )
     {
         //*** get average raw value for the weight ***
-        calWeightVal_ = hx711_->getRawAvg( NUM_CAL_SAMPLES );
+        calWeightVal_ = nau7802_->getRawAvg( NUM_CAL_SAMPLES );
 
         //*** set new calibration data ***
-        hx711_->setCalibrationData( calTareVal_, calWeightVal_, calWeight_ );
+        nau7802_->setCalibrationData( calTareVal_, calWeightVal_, calWeight_ );
 
         //*** get and save new calculated values ***
-        hx711_->getCalibrationData( tare_, scale_ );
+        nau7802_->getCalibrationData( tare_, scale_ );
         saveSettings();
 
         //*** exit calibration mode ***
@@ -404,7 +400,7 @@ void MainWindow::handleNameSelected( QListWidgetItem *item )
 void MainWindow::handleWeigh()
 {
     //*** read the scale ***
-    float weight = hx711_->getWeight();
+    float weight = nau7802_->getWeight();
 
     //*** factor in basket? ***
     if ( ui->basketBtn->isChecked() )
@@ -602,10 +598,10 @@ Q_UNUSED( socketError )
 void MainWindow::handleTare()
 {
     //*** get the new tare value ***
-    tare_ = hx711_->getRawAvg( NUM_TARE_SAMPLES );
+    tare_ = nau7802_->getRawAvg( NUM_TARE_SAMPLES );
 
     //*** set it in the scale object ***
-    hx711_->setTare( tare_ );
+    nau7802_->setTare( tare_ );
 
     //*** save current value ***
     saveSettings();
@@ -622,7 +618,7 @@ void MainWindow::handleTare()
 void MainWindow::requestWeight()
 {
     //*** read the scale ***
-    float weight = hx711_->getWeight();
+    float weight = nau7802_->getWeight();
 
     //*** format the weight ***
     QString wLine;
@@ -759,8 +755,8 @@ void MainWindow::setupServer()
 //*****************************************************************************
 void MainWindow::setupScale()
 {
-    //*** class that reads serial data from the hx711 board ***
-    hx711_ = new HX711( DT_PIN, SCK_PIN, tare_, scale_ );
+    //*** class that reads i2c data from the nau7802 board ***
+    nau7802_ = new NAU7802( tare_, scale_ );
 }
 
 
